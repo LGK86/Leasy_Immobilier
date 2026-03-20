@@ -1,6 +1,6 @@
 'use client'
-
 export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -39,7 +39,6 @@ export default function RegisterPage() {
       toast.error(error.message)
       setLoading(false)
     } else {
-      // Update profile with name
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         await supabase.from('profiles').upsert({
