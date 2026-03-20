@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
   await supabase.from('documents').update(updates).eq('id', documentId)
 
-  if (sendEmail && doc.tenant?.email && process.env.RESEND_API_KEY !== 're_placeholder_add_your_resend_api_key_here') {
+  if (sendEmail && doc.tenant?.email && process.env.RESEND_API_KEY) {
     await resend.emails.send({
       from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
       to: doc.tenant.email,

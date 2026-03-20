@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Send email if requested
-  if (sendEmail && tenant.email && process.env.RESEND_API_KEY !== 're_placeholder_add_your_resend_api_key_here') {
+  if (sendEmail && tenant.email && process.env.RESEND_API_KEY) {
     const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
     await resend.emails.send({
       from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
