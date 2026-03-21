@@ -6,13 +6,12 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { FileText, Download, Send, Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
-const MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
 const MONTHS_FULL = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
 
 interface Props {
@@ -21,6 +20,14 @@ interface Props {
   tenants: { id: string; first_name: string; last_name: string; property_id: string | null }[]
   payments: any[]
   userId: string
+}
+
+function TriggerLabel({ value, placeholder }: { value?: string; placeholder: string }) {
+  return (
+    <span className="flex-1 text-left truncate text-sm">
+      {value ?? <span className="text-muted-foreground">{placeholder}</span>}
+    </span>
+  )
 }
 
 export default function ReceiptList({ receipts, properties, tenants, payments, userId }: Props) {
@@ -36,6 +43,10 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
   const router = useRouter()
 
   const filteredTenants = tenants.filter(t => !form.property_id || t.property_id === form.property_id)
+
+  const selectedProperty = properties.find(p => p.id === form.property_id)
+  const selectedTenant = filteredTenants.find(t => t.id === form.tenant_id)
+  const selectedMonth = MONTHS_FULL[parseInt(form.period_month) - 1]
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,7 +78,7 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
         setOpen(false)
         router.refresh()
       } else {
-        toast.error('Erreur : ' + (data.error ?? 'Génération échouée'))
+        toast.error('Erreur : ' + (data.error ?? 'Génération échouée') + (data.detail ? ` — ${data.detail}` : ''))
       }
     } catch {
       toast.error('Erreur de génération')
@@ -102,8 +113,8 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
         }),
       })
       const data = await res.json()
-      if (data.success) toast.success('Quittance envoyée par email')
-      else toast.error('Erreur envoi email')
+      if (data.success) { toast.success('Quittance envoyée par email'); router.refresh() }
+      else toast.error('Erreur : ' + (data.error ?? 'Envoi échoué'))
     } catch { toast.error('Erreur') }
     setGenerating(null)
   }
@@ -115,8 +126,8 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Quittances</h1>
-          <p className="text-slate-500 mt-1">{receipts.length} quittance(s)</p>
+          <h1 className="text-2xl font-bold text-leasy-dark">Quittances</h1>
+          <p className="text-leasy-muted mt-1">{receipts.length} quittance(s)</p>
         </div>
         <Button onClick={() => setOpen(true)}>
           <Plus className="h-4 w-4 mr-2" /> Générer une quittance
@@ -127,8 +138,8 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
         <CardContent className="p-0">
           {receipts.length === 0 ? (
             <div className="text-center py-16">
-              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-400">Aucune quittance générée</p>
+              <FileText className="h-12 w-12 text-leasy-border mx-auto mb-4" />
+              <p className="text-leasy-muted">Aucune quittance générée</p>
             </div>
           ) : (
             <Table>
@@ -146,26 +157,27 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
                 {receipts.map((r: any) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-medium">{r.tenant?.first_name} {r.tenant?.last_name}</TableCell>
-                    <TableCell className="text-slate-500 text-sm">{r.property?.address}</TableCell>
-                    <TableCell>{MONTHS[r.period_month - 1]} {r.period_year}</TableCell>
-                    <TableCell className="font-semibold">{(Number(r.amount) + Number(r.charges)).toLocaleString('fr-FR')} €</TableCell>
+                    <TableCell className="text-leasy-muted text-sm">{r.property?.address}</TableCell>
+                    <TableCell>{MONTHS_FULL[r.period_month - 1]} {r.period_year}</TableCell>
+                    <TableCell className="font-semibold">
+                      {(Number(r.amount) + Number(r.charges)).toFixed(2).replace('.', ',')} €
+                    </TableCell>
                     <TableCell>
                       {r.sent_at
-                        ? <Badge variant="default" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Envoyée</Badge>
+                        ? <Badge className="bg-emerald-100 text-emerald-700">Envoyée</Badge>
                         : <Badge variant="secondary">Non envoyée</Badge>
                       }
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end">
                         {r.file_path && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownload(r.file_path)} title="Télécharger">
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleDownload(r.file_path)} title="Télécharger">
                             <Download className="h-4 w-4" />
                           </Button>
                         )}
                         <Button
                           variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-blue-600"
+                          size="icon-sm"
                           onClick={() => handleSendEmail(r)}
                           disabled={generating === r.id}
                           title="Envoyer par email"
@@ -193,36 +205,66 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
           <form onSubmit={handleGenerate} className="space-y-4">
             <div className="space-y-2">
               <Label>Bien</Label>
-              <Select value={form.property_id || undefined} onValueChange={(v) => setForm(f => ({ ...f, property_id: v ?? '', tenant_id: '' }))}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Sélectionner un bien" /></SelectTrigger>
+              <Select
+                value={form.property_id || undefined}
+                onValueChange={(v) => setForm(f => ({ ...f, property_id: v ?? '', tenant_id: '' }))}
+              >
+                <SelectTrigger className="w-full">
+                  <TriggerLabel
+                    value={selectedProperty ? `${selectedProperty.address}, ${selectedProperty.city}` : undefined}
+                    placeholder="Sélectionner un bien"
+                  />
+                </SelectTrigger>
                 <SelectContent>
-                  {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.address}</SelectItem>)}
+                  {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.address}, {p.city}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Locataire</Label>
-              <Select value={form.tenant_id || undefined} onValueChange={(v) => setForm(f => ({ ...f, tenant_id: v ?? '' }))}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Sélectionner un locataire" /></SelectTrigger>
+              <Select
+                value={form.tenant_id || undefined}
+                onValueChange={(v) => setForm(f => ({ ...f, tenant_id: v ?? '' }))}
+              >
+                <SelectTrigger className="w-full">
+                  <TriggerLabel
+                    value={selectedTenant ? `${selectedTenant.first_name} ${selectedTenant.last_name}` : undefined}
+                    placeholder="Sélectionner un locataire"
+                  />
+                </SelectTrigger>
                 <SelectContent>
-                  {filteredTenants.map(t => <SelectItem key={t.id} value={t.id}>{t.first_name} {t.last_name}</SelectItem>)}
+                  {filteredTenants.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.first_name} {t.last_name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Mois</Label>
-                <Select value={form.period_month} onValueChange={(v) => setForm(f => ({ ...f, period_month: v ?? form.period_month }))}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <Select
+                  value={form.period_month}
+                  onValueChange={(v) => setForm(f => ({ ...f, period_month: v ?? f.period_month }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <TriggerLabel value={selectedMonth} placeholder="" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {MONTHS_FULL.map((m, i) => <SelectItem key={i + 1} value={(i + 1).toString()}>{m}</SelectItem>)}
+                    {MONTHS_FULL.map((m, i) => (
+                      <SelectItem key={i + 1} value={(i + 1).toString()}>{m}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Année</Label>
-                <Select value={form.period_year} onValueChange={(v) => setForm(f => ({ ...f, period_year: v ?? form.period_year }))}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <Select
+                  value={form.period_year}
+                  onValueChange={(v) => setForm(f => ({ ...f, period_year: v ?? f.period_year }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <TriggerLabel value={form.period_year} placeholder="" />
+                  </SelectTrigger>
                   <SelectContent>
                     {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
                   </SelectContent>
@@ -235,13 +277,17 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
                 id="send_email"
                 checked={form.send_email}
                 onChange={e => setForm(f => ({ ...f, send_email: e.target.checked }))}
-                className="rounded"
+                className="h-4 w-4 rounded border-leasy-border accent-leasy-dark"
               />
-              <label htmlFor="send_email" className="text-sm text-slate-600">
+              <label htmlFor="send_email" className="text-sm text-leasy-muted cursor-pointer">
                 Envoyer par email au locataire
               </label>
             </div>
-            <Button type="submit" className="w-full" disabled={!!generating || !form.property_id || !form.tenant_id}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!!generating || !form.property_id || !form.tenant_id}
+            >
               {generating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Générer
             </Button>

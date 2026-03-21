@@ -16,7 +16,7 @@ export default async function ReceiptsPage() {
       .order('period_month', { ascending: false }),
     supabase.from('properties').select('id, address, city').eq('owner_id', user.id),
     supabase.from('tenants').select('id, first_name, last_name, property_id').eq('owner_id', user.id),
-    supabase.from('rent_payments').select('id, property_id, tenant_id, period_month, period_year, amount, charges').eq('owner_id', user.id).eq('status', 'paid'),
+    supabase.from('rent_payments').select('id, property_id, tenant_id, period_month, period_year, amount, charges').eq('owner_id', user.id).in('status', ['received', 'paid']),
   ])
 
   return (

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateReceiptPDF } from '@/lib/pdf/receipt'
+import { revalidatePath } from 'next/cache'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { paymentId, sendEmail = false, propertyId, tenantId, periodMonth, periodYear } = body
 
-    console.log('[receipt/generate] user:', user.id, '| property:', propertyId, '| tenant:', tenantId, '| period:', periodMonth, '/', periodYear)
+    console.log('[receipt/generate] START | user:', user.id, '| property:', propertyId, '| tenant:', tenantId, '| period:', periodMonth, '/', periodYear)
 
     // Get profile
     const { data: profile, error: profileError } = await supabase
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
       console.error('[receipt/generate] profile error:', profileError)
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
+    console.log('[receipt/generate] profile OK:', profile.first_name, profile.last_name)
 
     // Get property & tenant
     const [{ data: property, error: propError }, { data: tenant, error: tenantError }] = await Promise.all([
@@ -38,6 +40,7 @@ export async function POST(request: NextRequest) {
       console.error('[receipt/generate] tenant error:', tenantError)
       return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
     }
+    console.log('[receipt/generate] property OK:', property.address, '| tenant OK:', tenant.first_name, tenant.last_name)
 
     // Get or use payment data
     let rent = property.monthly_rent
@@ -46,10 +49,12 @@ export async function POST(request: NextRequest) {
       const { data: payment, error: paymentError } = await supabase
         .from('rent_payments').select('*').eq('id', paymentId).single()
       if (paymentError) console.warn('[receipt/generate] payment fetch warning:', paymentError)
-      if (payment) { rent = payment.amount; charges = payment.charges }
+      if (payment) {
+        rent = payment.amount
+        charges = payment.charges
+        console.log('[receipt/generate] payment found, using amount:', rent, 'charges:', charges)
+      }
     }
-
-    console.log('[receipt/generate] generating PDF | rent:', rent, '| charges:', charges)
 
     // Generate PDF
     let pdfBytes: Uint8Array
@@ -71,12 +76,11 @@ export async function POST(request: NextRequest) {
         periodYear: Number(periodYear),
         issueDate: new Date().toISOString().split('T')[0],
       })
+      console.log('[receipt/generate] PDF generated, size:', pdfBytes.length, 'bytes')
     } catch (pdfError) {
       console.error('[receipt/generate] PDF generation error:', pdfError)
       return NextResponse.json({ error: 'PDF generation failed', detail: String(pdfError) }, { status: 500 })
     }
-
-    console.log('[receipt/generate] PDF generated, size:', pdfBytes.length, 'bytes')
 
     // Upload to Supabase Storage
     const fileName = `${user.id}/receipts/${propertyId}/${tenantId}_${periodYear}_${String(periodMonth).padStart(2, '0')}.pdf`
@@ -85,14 +89,23 @@ export async function POST(request: NextRequest) {
       .upload(fileName, pdfBytes, { contentType: 'application/pdf', upsert: true })
 
     if (uploadError) {
-      console.error('[receipt/generate] upload error:', uploadError)
+      console.error('[receipt/generate] upload error:', JSON.stringify(uploadError))
       return NextResponse.json({ error: 'Upload failed', detail: uploadError.message }, { status: 500 })
     }
-
     console.log('[receipt/generate] uploaded to:', fileName)
 
-    // Save receipt record
-    const { data: receipt, error: receiptError } = await supabase.from('rent_receipts').upsert({
+    // Save receipt — check for existing record first to avoid upsert constraint issues
+    const { data: existing } = await supabase
+      .from('rent_receipts')
+      .select('id')
+      .eq('owner_id', user.id)
+      .eq('property_id', propertyId)
+      .eq('tenant_id', tenantId)
+      .eq('period_month', Number(periodMonth))
+      .eq('period_year', Number(periodYear))
+      .single()
+
+    const receiptPayload = {
       owner_id: user.id,
       property_id: propertyId,
       tenant_id: tenantId,
@@ -103,19 +116,45 @@ export async function POST(request: NextRequest) {
       charges: Number(charges),
       issue_date: new Date().toISOString().split('T')[0],
       file_path: fileName,
-      sent_at: sendEmail ? new Date().toISOString() : null,
-    }, {
-      onConflict: 'owner_id,property_id,tenant_id,period_month,period_year',
-      ignoreDuplicates: false,
-    }).select().single()
-
-    if (receiptError) {
-      console.error('[receipt/generate] receipt DB error:', receiptError)
+      sent_at: sendEmail ? new Date().toISOString() : (existing ? undefined : null),
     }
+
+    let receiptId: string | undefined
+    if (existing) {
+      console.log('[receipt/generate] updating existing receipt:', existing.id)
+      const { data, error } = await supabase
+        .from('rent_receipts')
+        .update(receiptPayload)
+        .eq('id', existing.id)
+        .select('id')
+        .single()
+      if (error) {
+        console.error('[receipt/generate] receipt update error:', JSON.stringify(error))
+        return NextResponse.json({ error: 'Failed to save receipt record', detail: error.message }, { status: 500 })
+      }
+      receiptId = data?.id
+    } else {
+      console.log('[receipt/generate] inserting new receipt record')
+      const { data, error } = await supabase
+        .from('rent_receipts')
+        .insert(receiptPayload)
+        .select('id')
+        .single()
+      if (error) {
+        console.error('[receipt/generate] receipt insert error:', JSON.stringify(error))
+        return NextResponse.json({ error: 'Failed to save receipt record', detail: error.message }, { status: 500 })
+      }
+      receiptId = data?.id
+    }
+
+    console.log('[receipt/generate] receipt saved, id:', receiptId)
+
+    // Invalidate receipts page cache so router.refresh() sees fresh data
+    revalidatePath('/receipts')
 
     // Send email if requested
     if (sendEmail && tenant.email && process.env.RESEND_API_KEY) {
-      const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
+      const MONTHS_FR = ['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre']
       try {
         await resend.emails.send({
           from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
@@ -123,8 +162,8 @@ export async function POST(request: NextRequest) {
           subject: `Quittance de loyer - ${MONTHS_FR[Number(periodMonth) - 1]} ${periodYear}`,
           html: `
             <p>Bonjour ${tenant.first_name} ${tenant.last_name},</p>
-            <p>Veuillez trouver ci-joint votre quittance de loyer pour le mois de ${MONTHS_FR[Number(periodMonth) - 1]} ${periodYear}.</p>
-            <p>Montant total : <strong>${(Number(rent) + Number(charges)).toFixed(2)} &euro;</strong></p>
+            <p>Votre quittance de loyer pour ${MONTHS_FR[Number(periodMonth) - 1]} ${periodYear} est disponible.</p>
+            <p>Montant total : <strong>${(Number(rent) + Number(charges)).toFixed(2)} EUR</strong></p>
             <p>Cordialement,<br/>${profile.first_name} ${profile.last_name}</p>
           `,
           attachments: [{
@@ -132,12 +171,15 @@ export async function POST(request: NextRequest) {
             content: Buffer.from(pdfBytes).toString('base64'),
           }],
         })
+        console.log('[receipt/generate] email sent to:', tenant.email)
       } catch (emailError) {
         console.error('[receipt/generate] email error:', emailError)
+        // Email failure does not block success response
       }
     }
 
-    return NextResponse.json({ success: true, filePath: fileName, receiptId: receipt?.id })
+    console.log('[receipt/generate] DONE | receiptId:', receiptId)
+    return NextResponse.json({ success: true, filePath: fileName, receiptId })
   } catch (err) {
     console.error('[receipt/generate] unhandled error:', err)
     return NextResponse.json({ error: 'Internal server error', detail: String(err) }, { status: 500 })
