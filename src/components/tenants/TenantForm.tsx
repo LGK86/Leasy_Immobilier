@@ -28,10 +28,21 @@ export default function TenantForm({ tenant, properties, userId, onSuccess }: Pr
     property_id: tenant?.property_id ?? '',
     entry_date: tenant?.entry_date ?? '',
     lease_end_date: tenant?.lease_end_date ?? '',
+    tacite_reconduction: tenant?.tacite_reconduction ?? false,
   })
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleEntryDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const entry = e.target.value
+    let leaseEnd = form.lease_end_date
+    if (entry && !form.lease_end_date) {
+      const d = new Date(entry)
+      d.setFullYear(d.getFullYear() + 1)
+      leaseEnd = d.toISOString().split('T')[0]
+    }
+    setForm(f => ({ ...f, entry_date: entry, lease_end_date: leaseEnd }))
+  }
+
+  const save = async (status: 'draft' | 'active') => {
     setLoading(true)
 
     const data = {
@@ -43,6 +54,8 @@ export default function TenantForm({ tenant, properties, userId, onSuccess }: Pr
       property_id: form.property_id || null,
       entry_date: form.entry_date || null,
       lease_end_date: form.lease_end_date || null,
+      tacite_reconduction: form.tacite_reconduction,
+      status,
       updated_at: new Date().toISOString(),
     }
 
@@ -56,8 +69,16 @@ export default function TenantForm({ tenant, properties, userId, onSuccess }: Pr
     }
 
     if (error) toast.error('Erreur : ' + error.message)
-    else { toast.success(tenant ? 'Locataire modifié' : 'Locataire ajouté'); onSuccess() }
+    else {
+      toast.success(status === 'draft' ? 'Brouillon sauvegardé' : 'Locataire validé')
+      onSuccess()
+    }
     setLoading(false)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await save('active')
   }
 
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -102,17 +123,43 @@ export default function TenantForm({ tenant, properties, userId, onSuccess }: Pr
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label>Date d&apos;entrée</Label>
-          <Input type="date" value={form.entry_date} onChange={set('entry_date')} />
+          <Input type="date" value={form.entry_date} onChange={handleEntryDateChange} />
         </div>
         <div className="space-y-2">
           <Label>Fin de bail</Label>
           <Input type="date" value={form.lease_end_date} onChange={set('lease_end_date')} />
         </div>
       </div>
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-        {tenant ? 'Enregistrer' : 'Ajouter'}
-      </Button>
+      <div className="flex items-center gap-2">
+        <input
+          id="tacite"
+          type="checkbox"
+          checked={form.tacite_reconduction}
+          onChange={e => setForm(f => ({ ...f, tacite_reconduction: e.target.checked }))}
+          className="h-4 w-4 rounded border-leasy-border accent-leasy-dark"
+        />
+        <Label htmlFor="tacite" className="cursor-pointer font-normal">Tacite reconduction</Label>
+      </div>
+      <div className="flex gap-3 pt-1">
+        <Button
+          type="button"
+          variant="outline"
+          className="flex-1"
+          disabled={loading}
+          onClick={() => save('draft')}
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          Sauvegarder
+        </Button>
+        <Button
+          type="submit"
+          className="flex-1"
+          disabled={loading}
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          Valider
+        </Button>
+      </div>
     </form>
   )
 }

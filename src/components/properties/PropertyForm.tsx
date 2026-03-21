@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import AddressAutocomplete from '@/components/ui/address-autocomplete'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
@@ -78,7 +79,18 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label>Adresse</Label>
-        <Input placeholder="12 rue de la Paix" value={form.address} onChange={set('address')} required />
+        <AddressAutocomplete
+          value={form.address}
+          onChange={(address, city, postalCode) =>
+            setForm(f => ({
+              ...f,
+              address,
+              ...(city ? { city } : {}),
+              ...(postalCode ? { postal_code: postalCode } : {}),
+            }))
+          }
+          required
+        />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
@@ -101,7 +113,7 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
               <SelectItem value="apartment">Appartement</SelectItem>
               <SelectItem value="house">Maison</SelectItem>
               <SelectItem value="studio">Studio</SelectItem>
-              <SelectItem value="commercial">Local commercial</SelectItem>
+              <SelectItem value="room">Chambre</SelectItem>
               <SelectItem value="other">Autre</SelectItem>
             </SelectContent>
           </Select>
@@ -122,15 +134,15 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-2">
           <Label>Loyer (€)</Label>
-          <Input type="number" placeholder="800" value={form.monthly_rent} onChange={set('monthly_rent')} required min="0" step="0.01" />
+          <Input type="number" placeholder="800" value={form.monthly_rent} onChange={set('monthly_rent')} required min="0" step="10" />
         </div>
         <div className="space-y-2">
           <Label>Charges (€)</Label>
-          <Input type="number" placeholder="50" value={form.charges} onChange={set('charges')} min="0" step="0.01" />
+          <Input type="number" placeholder="50" value={form.charges} onChange={set('charges')} min="0" step="10" />
         </div>
         <div className="space-y-2">
           <Label>Dépôt (€)</Label>
-          <Input type="number" placeholder="1600" value={form.deposit} onChange={set('deposit')} min="0" step="0.01" />
+          <Input type="number" placeholder="1600" value={form.deposit} onChange={set('deposit')} min="0" step="10" />
         </div>
       </div>
       <div className="space-y-2">

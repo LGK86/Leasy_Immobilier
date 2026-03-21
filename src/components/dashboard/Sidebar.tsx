@@ -27,15 +27,15 @@ export default function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <div className="w-64 bg-white border-r border-slate-200 flex flex-col">
-      <div className="p-6 border-b border-slate-200">
+    <div className="w-64 flex flex-col" style={{ backgroundColor: '#063B26' }}>
+      <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-2">
-          <div className="bg-blue-600 p-2 rounded-lg">
-            <Building2 className="h-5 w-5 text-white" />
+          <div className="bg-leasy-accent p-2 rounded-lg">
+            <Building2 className="h-5 w-5 text-leasy-dark" />
           </div>
           <div>
-            <p className="font-bold text-slate-800 text-sm">Leasy</p>
-            <p className="text-xs text-slate-500">Immobilier</p>
+            <p className="font-bold text-white text-sm">Leasy</p>
+            <p className="text-xs text-white/50">Immobilier</p>
           </div>
         </div>
       </div>
@@ -52,19 +52,19 @@ export default function Sidebar() {
               className={cn(
                 'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'bg-leasy-accent text-leasy-dark'
+                  : 'text-white/70 hover:bg-white/10 hover:text-white'
               )}
             >
-              <item.icon className={cn('h-5 w-5', isActive ? 'text-blue-600' : 'text-slate-400')} />
+              <item.icon className={cn('h-5 w-5', isActive ? 'text-leasy-dark' : 'text-white/50')} />
               {item.name}
             </Link>
           )
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-200">
-        <p className="text-xs text-slate-400 text-center">v1.0.0</p>
+      <div className="p-4 border-t border-white/10">
+        <p className="text-xs text-white/30 text-center">v1.0.0</p>
       </div>
     </div>
   )

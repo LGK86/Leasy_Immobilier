@@ -13,9 +13,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from 'sonner'
 import { Building2, Loader2 } from 'lucide-react'
 
+function validatePassword(pw: string): string | null {
+  if (pw.length < 8) return 'Le mot de passe doit contenir au moins 8 caractères.'
+  if (!/[A-Z]/.test(pw)) return 'Le mot de passe doit contenir au moins une majuscule.'
+  if (!/[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw)) return 'Le mot de passe doit contenir au moins un chiffre ou caractère spécial.'
+  return null
+}
+
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [loading, setLoading] = useState(false)
@@ -24,6 +32,11 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    const pwError = validatePassword(password)
+    if (pwError) { toast.error(pwError); return }
+    if (password !== confirmPassword) { toast.error('Les mots de passe ne correspondent pas.'); return }
+
     setLoading(true)
 
     const { error } = await supabase.auth.signUp({
@@ -54,14 +67,14 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-leasy-bg p-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-2 rounded-lg">
-              <Building2 className="h-6 w-6 text-white" />
+            <div className="bg-leasy-accent p-2 rounded-lg">
+              <Building2 className="h-6 w-6 text-leasy-dark" />
             </div>
-            <span className="text-2xl font-bold text-slate-800">Leasy Immobilier</span>
+            <span className="text-2xl font-bold text-leasy-dark">Leasy Immobilier</span>
           </div>
         </div>
 
@@ -113,7 +126,18 @@ export default function RegisterPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  minLength={6}
+                  required
+                />
+                <p className="text-xs text-leasy-muted">8 caractères min., 1 majuscule, 1 chiffre ou caractère spécial</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                 />
               </div>
@@ -123,9 +147,9 @@ export default function RegisterPage() {
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Créer mon compte
               </Button>
-              <p className="text-sm text-slate-500 text-center">
+              <p className="text-sm text-leasy-muted text-center">
                 Déjà un compte ?{' '}
-                <Link href="/login" className="text-blue-600 hover:underline font-medium">
+                <Link href="/login" className="text-leasy-dark hover:underline font-medium">
                   Se connecter
                 </Link>
               </p>

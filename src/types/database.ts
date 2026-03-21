@@ -17,7 +17,7 @@ export type Property = {
   address: string
   city: string
   postal_code: string
-  type: 'apartment' | 'house' | 'studio' | 'commercial' | 'other'
+  type: 'apartment' | 'house' | 'studio' | 'room' | 'other'
   monthly_rent: number
   charges: number
   deposit: number
@@ -37,6 +37,8 @@ export type Tenant = {
   phone: string | null
   entry_date: string | null
   lease_end_date: string | null
+  status: 'draft' | 'active'
+  tacite_reconduction: boolean
   created_at: string
   updated_at: string
   property?: Property
@@ -52,7 +54,7 @@ export type RentPayment = {
   payment_date: string | null
   period_month: number
   period_year: number
-  status: 'paid' | 'pending' | 'late'
+  status: 'pending_validation' | 'received' | 'late'
   notes: string | null
   created_at: string
   updated_at: string

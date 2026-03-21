@@ -35,7 +35,7 @@ export default function PaymentForm({ payment, properties, tenants, userId, onSu
     charges: payment?.charges?.toString() ?? '0',
     period_month: payment?.period_month?.toString() ?? (new Date().getMonth() + 1).toString(),
     period_year: payment?.period_year?.toString() ?? new Date().getFullYear().toString(),
-    status: payment?.status ?? 'paid',
+    status: payment?.status ?? 'pending_validation',
     payment_date: payment?.payment_date ?? new Date().toISOString().split('T')[0],
     notes: payment?.notes ?? '',
   })
@@ -77,7 +77,7 @@ export default function PaymentForm({ payment, properties, tenants, userId, onSu
       period_month: parseInt(form.period_month),
       period_year: parseInt(form.period_year),
       status: form.status,
-      payment_date: form.status === 'paid' ? form.payment_date : null,
+      payment_date: form.status === 'received' ? form.payment_date : null,
       notes: form.notes || null,
       updated_at: new Date().toISOString(),
     }
@@ -161,13 +161,13 @@ export default function PaymentForm({ payment, properties, tenants, userId, onSu
           <Select value={form.status} onValueChange={setSelect('status')}>
             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="paid">Payé</SelectItem>
-              <SelectItem value="pending">En attente</SelectItem>
+              <SelectItem value="received">Reçu</SelectItem>
+              <SelectItem value="pending_validation">En attente</SelectItem>
               <SelectItem value="late">En retard</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        {form.status === 'paid' && (
+        {form.status === 'received' && (
           <div className="space-y-2">
             <Label>Date de paiement</Label>
             <Input type="date" value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} />
