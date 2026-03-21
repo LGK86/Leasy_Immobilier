@@ -60,7 +60,8 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
     )
 
     try {
-      const res = await fetch('/api/receipts/generate', {
+      // Step 1: generate PDF + save receipt
+      const genRes = await fetch('/api/receipts/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -69,22 +70,35 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
           tenantId: form.tenant_id,
           periodMonth: parseInt(form.period_month),
           periodYear: parseInt(form.period_year),
-          sendEmail: form.send_email,
+          sendEmail: false,
         }),
       })
-      const data = await res.json()
-      if (data.success) {
-        if (form.send_email) {
-          if (data.emailSent) toast.success('Quittance générée et envoyée par email')
-          else toast.warning('Quittance générée, mais email non envoyé : ' + (data.emailError ?? 'erreur inconnue'))
-        } else {
-          toast.success('Quittance générée')
-        }
-        setOpen(false)
-        router.refresh()
-      } else {
-        toast.error('Erreur : ' + (data.error ?? 'Génération échouée') + (data.detail ? ` — ${data.detail}` : ''))
+      const genData = await genRes.json()
+      if (!genData.success) {
+        toast.error('Erreur génération : ' + (genData.error ?? 'inconnue') + (genData.detail ? ` — ${genData.detail}` : ''))
+        setGenerating(null)
+        return
       }
+
+      // Step 2: send email via dedicated route if requested
+      if (form.send_email && genData.receiptId) {
+        const mailRes = await fetch('/api/receipts/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ receiptId: genData.receiptId }),
+        })
+        const mailData = await mailRes.json()
+        if (mailData.success) {
+          toast.success('Quittance générée et envoyée par email à ' + mailData.sentTo)
+        } else {
+          toast.warning('Quittance générée, mais email non envoyé : ' + (mailData.error ?? 'erreur inconnue') + (mailData.detail ? ` — ${mailData.detail}` : ''))
+        }
+      } else {
+        toast.success('Quittance générée')
+      }
+
+      setOpen(false)
+      router.refresh()
     } catch {
       toast.error('Erreur de génération')
     }
@@ -106,23 +120,17 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
   const handleSendEmail = async (receipt: any) => {
     setGenerating(receipt.id)
     try {
-      const res = await fetch('/api/receipts/generate', {
+      const res = await fetch('/api/receipts/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          propertyId: receipt.property_id,
-          tenantId: receipt.tenant_id,
-          periodMonth: receipt.period_month,
-          periodYear: receipt.period_year,
-          sendEmail: true,
-        }),
+        body: JSON.stringify({ receiptId: receipt.id }),
       })
       const data = await res.json()
       if (data.success) {
-        if (data.emailSent) { toast.success('Quittance envoyée par email'); router.refresh() }
-        else toast.error('Email non envoyé : ' + (data.emailError ?? 'erreur inconnue'))
+        toast.success('Quittance envoyée par email à ' + (data.sentTo ?? receipt.tenant?.email ?? ''))
+        router.refresh()
       } else {
-        toast.error('Erreur : ' + (data.error ?? 'Envoi échoué') + (data.detail ? ` — ${data.detail}` : ''))
+        toast.error('Erreur envoi : ' + (data.error ?? 'Envoi échoué') + (data.detail ? ` — ${data.detail}` : ''))
       }
     } catch { toast.error('Erreur') }
     setGenerating(null)
