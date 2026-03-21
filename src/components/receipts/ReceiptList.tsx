@@ -74,7 +74,12 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
       })
       const data = await res.json()
       if (data.success) {
-        toast.success(form.send_email ? 'Quittance générée et envoyée' : 'Quittance générée')
+        if (form.send_email) {
+          if (data.emailSent) toast.success('Quittance générée et envoyée par email')
+          else toast.warning('Quittance générée, mais email non envoyé : ' + (data.emailError ?? 'erreur inconnue'))
+        } else {
+          toast.success('Quittance générée')
+        }
         setOpen(false)
         router.refresh()
       } else {
@@ -113,8 +118,12 @@ export default function ReceiptList({ receipts, properties, tenants, payments, u
         }),
       })
       const data = await res.json()
-      if (data.success) { toast.success('Quittance envoyée par email'); router.refresh() }
-      else toast.error('Erreur : ' + (data.error ?? 'Envoi échoué'))
+      if (data.success) {
+        if (data.emailSent) { toast.success('Quittance envoyée par email'); router.refresh() }
+        else toast.error('Email non envoyé : ' + (data.emailError ?? 'erreur inconnue'))
+      } else {
+        toast.error('Erreur : ' + (data.error ?? 'Envoi échoué') + (data.detail ? ` — ${data.detail}` : ''))
+      }
     } catch { toast.error('Erreur') }
     setGenerating(null)
   }

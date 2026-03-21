@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
   if (sendEmail && doc.tenant?.email && process.env.RESEND_API_KEY) {
     await resend.emails.send({
-      from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
+      from: 'Leasy Immobilier <onboarding@resend.dev>',
       to: doc.tenant.email,
       subject: `Document à signer : ${doc.title}`,
       html: `

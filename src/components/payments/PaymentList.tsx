@@ -65,9 +65,13 @@ export default function PaymentList({ payments, properties, tenants, userId }: P
           sendEmail: false,
         }),
       })
-      if (!res.ok) throw new Error()
-      toast.success('Quittance générée')
-      router.refresh()
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Quittance générée')
+        router.refresh()
+      } else {
+        toast.error('Erreur : ' + (data.error ?? 'Génération échouée') + (data.detail ? ` — ${data.detail}` : ''))
+      }
     } catch {
       toast.error('Erreur lors de la génération')
     }

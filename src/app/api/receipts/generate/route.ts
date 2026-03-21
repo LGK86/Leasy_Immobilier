@@ -153,33 +153,52 @@ export async function POST(request: NextRequest) {
     revalidatePath('/receipts')
 
     // Send email if requested
-    if (sendEmail && tenant.email && process.env.RESEND_API_KEY) {
-      const MONTHS_FR = ['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre']
-      try {
-        await resend.emails.send({
-          from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
-          to: tenant.email,
-          subject: `Quittance de loyer - ${MONTHS_FR[Number(periodMonth) - 1]} ${periodYear}`,
-          html: `
-            <p>Bonjour ${tenant.first_name} ${tenant.last_name},</p>
-            <p>Votre quittance de loyer pour ${MONTHS_FR[Number(periodMonth) - 1]} ${periodYear} est disponible.</p>
-            <p>Montant total : <strong>${(Number(rent) + Number(charges)).toFixed(2)} EUR</strong></p>
-            <p>Cordialement,<br/>${profile.first_name} ${profile.last_name}</p>
-          `,
-          attachments: [{
-            filename: `quittance_${periodYear}_${String(periodMonth).padStart(2, '0')}.pdf`,
-            content: Buffer.from(pdfBytes).toString('base64'),
-          }],
-        })
-        console.log('[receipt/generate] email sent to:', tenant.email)
-      } catch (emailError) {
-        console.error('[receipt/generate] email error:', emailError)
-        // Email failure does not block success response
+    let emailSent = false
+    let emailError: string | undefined
+
+    if (sendEmail) {
+      if (!tenant.email) {
+        emailError = 'Le locataire n\'a pas d\'adresse email.'
+        console.warn('[receipt/generate] email skipped: tenant has no email')
+      } else if (!process.env.RESEND_API_KEY) {
+        emailError = 'RESEND_API_KEY manquante.'
+        console.warn('[receipt/generate] email skipped: RESEND_API_KEY not set')
+      } else {
+        const MONTHS_FR = ['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre']
+        const monthLabel = MONTHS_FR[Number(periodMonth) - 1] ?? String(periodMonth)
+        console.log('[receipt/generate] sending email to:', tenant.email)
+        try {
+          const { data: emailData, error: resendError } = await resend.emails.send({
+            from: 'Leasy Immobilier <onboarding@resend.dev>',
+            to: tenant.email,
+            subject: `Quittance de loyer - ${monthLabel} ${periodYear}`,
+            html: `
+              <p>Bonjour ${tenant.first_name} ${tenant.last_name},</p>
+              <p>Veuillez trouver ci-joint votre quittance de loyer pour le mois de <strong>${monthLabel} ${periodYear}</strong>.</p>
+              <p>Montant total : <strong>${(Number(rent) + Number(charges)).toFixed(2)} EUR</strong></p>
+              <p>Cordialement,<br/>${profile.first_name ?? ''} ${profile.last_name ?? ''}</p>
+            `,
+            attachments: [{
+              filename: `quittance_${periodYear}_${String(periodMonth).padStart(2, '0')}.pdf`,
+              content: Buffer.from(pdfBytes).toString('base64'),
+            }],
+          })
+          if (resendError) {
+            emailError = resendError.message
+            console.error('[receipt/generate] resend error:', JSON.stringify(resendError))
+          } else {
+            emailSent = true
+            console.log('[receipt/generate] email sent, id:', emailData?.id, '→', tenant.email)
+          }
+        } catch (err) {
+          emailError = String(err)
+          console.error('[receipt/generate] email exception:', err)
+        }
       }
     }
 
-    console.log('[receipt/generate] DONE | receiptId:', receiptId)
-    return NextResponse.json({ success: true, filePath: fileName, receiptId })
+    console.log('[receipt/generate] DONE | receiptId:', receiptId, '| emailSent:', emailSent)
+    return NextResponse.json({ success: true, filePath: fileName, receiptId, emailSent, emailError })
   } catch (err) {
     console.error('[receipt/generate] unhandled error:', err)
     return NextResponse.json({ error: 'Internal server error', detail: String(err) }, { status: 500 })
