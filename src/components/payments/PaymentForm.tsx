@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -17,12 +17,26 @@ const MONTHS = [
   { v: '10', l: 'Octobre' }, { v: '11', l: 'Novembre' }, { v: '12', l: 'Décembre' },
 ]
 
+const STATUS_LABELS: Record<string, string> = {
+  received:           'Paiement reçu',
+  pending_validation: 'En attente de validation',
+  late:               'En retard',
+}
+
 interface Props {
   payment: any
   properties: { id: string; address: string; city: string }[]
   tenants: { id: string; first_name: string; last_name: string; property_id: string | null }[]
   userId: string
   onSuccess: () => void
+}
+
+function TriggerLabel({ value, placeholder }: { value?: string; placeholder: string }) {
+  return (
+    <span className="flex-1 text-left truncate text-sm">
+      {value ?? <span className="text-muted-foreground">{placeholder}</span>}
+    </span>
+  )
 }
 
 export default function PaymentForm({ payment, properties, tenants, userId, onSuccess }: Props) {
@@ -43,6 +57,11 @@ export default function PaymentForm({ payment, properties, tenants, userId, onSu
   const filteredTenants = tenants.filter(t =>
     !form.property_id || t.property_id === form.property_id
   )
+
+  // Computed display labels
+  const selectedProperty = properties.find(p => p.id === form.property_id)
+  const selectedTenant = filteredTenants.find(t => t.id === form.tenant_id)
+  const selectedMonth = MONTHS.find(m => m.v === form.period_month)
 
   useEffect(() => {
     if (form.property_id && !payment) {
@@ -107,17 +126,33 @@ export default function PaymentForm({ payment, properties, tenants, userId, onSu
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label>Bien</Label>
-        <Select value={form.property_id || undefined} onValueChange={(v) => setForm(f => ({ ...f, property_id: v ?? '', tenant_id: '' }))}>
-          <SelectTrigger className="w-full"><SelectValue placeholder="Sélectionner un bien" /></SelectTrigger>
+        <Select
+          value={form.property_id || undefined}
+          onValueChange={(v) => setForm(f => ({ ...f, property_id: v ?? '', tenant_id: '' }))}
+        >
+          <SelectTrigger className="w-full">
+            <TriggerLabel
+              value={selectedProperty ? `${selectedProperty.address}, ${selectedProperty.city}` : undefined}
+              placeholder="Sélectionner un bien"
+            />
+          </SelectTrigger>
           <SelectContent>
-            {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.address}, {p.city}</SelectItem>)}
+            {properties.map(p => (
+              <SelectItem key={p.id} value={p.id}>{p.address}, {p.city}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
+
       <div className="space-y-2">
         <Label>Locataire</Label>
         <Select value={form.tenant_id || undefined} onValueChange={setSelect('tenant_id')}>
-          <SelectTrigger className="w-full"><SelectValue placeholder="Sélectionner un locataire" /></SelectTrigger>
+          <SelectTrigger className="w-full">
+            <TriggerLabel
+              value={selectedTenant ? `${selectedTenant.first_name} ${selectedTenant.last_name}` : undefined}
+              placeholder="Sélectionner un locataire"
+            />
+          </SelectTrigger>
           <SelectContent>
             {filteredTenants.map(t => (
               <SelectItem key={t.id} value={t.id}>{t.first_name} {t.last_name}</SelectItem>
@@ -125,11 +160,14 @@ export default function PaymentForm({ payment, properties, tenants, userId, onSu
           </SelectContent>
         </Select>
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label>Mois</Label>
           <Select value={form.period_month} onValueChange={setSelect('period_month')}>
-            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full">
+              <TriggerLabel value={selectedMonth?.l} placeholder="" />
+            </SelectTrigger>
             <SelectContent>
               {MONTHS.map(m => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}
             </SelectContent>
@@ -138,13 +176,16 @@ export default function PaymentForm({ payment, properties, tenants, userId, onSu
         <div className="space-y-2">
           <Label>Année</Label>
           <Select value={form.period_year} onValueChange={setSelect('period_year')}>
-            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full">
+              <TriggerLabel value={form.period_year} placeholder="" />
+            </SelectTrigger>
             <SelectContent>
               {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label>Loyer (€)</Label>
@@ -155,14 +196,17 @@ export default function PaymentForm({ payment, properties, tenants, userId, onSu
           <Input type="number" value={form.charges} onChange={e => setForm(f => ({ ...f, charges: e.target.value }))} min="0" step="0.01" />
         </div>
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label>Statut</Label>
           <Select value={form.status} onValueChange={setSelect('status')}>
-            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full">
+              <TriggerLabel value={STATUS_LABELS[form.status]} placeholder="" />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="received">Reçu</SelectItem>
-              <SelectItem value="pending_validation">En attente</SelectItem>
+              <SelectItem value="received">Paiement reçu</SelectItem>
+              <SelectItem value="pending_validation">En attente de validation</SelectItem>
               <SelectItem value="late">En retard</SelectItem>
             </SelectContent>
           </Select>
@@ -174,10 +218,12 @@ export default function PaymentForm({ payment, properties, tenants, userId, onSu
           </div>
         )}
       </div>
+
       <div className="space-y-2">
         <Label>Notes (optionnel)</Label>
         <Textarea placeholder="Remarques..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
       </div>
+
       <Button type="submit" className="w-full" disabled={loading || !form.property_id || !form.tenant_id}>
         {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
         {payment ? 'Enregistrer' : 'Ajouter'}
