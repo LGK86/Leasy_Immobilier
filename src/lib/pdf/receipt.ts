@@ -1,9 +1,22 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
+// ASCII-only month names — avoids accented chars issues in WinAnsiEncoding
 const MONTHS_FR = [
-  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+  'janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre'
 ]
+
+// Safe number formatter: avoids \u202F (NARROW NO-BREAK SPACE) produced by
+// toLocaleString('fr-FR') on Node 18+, which is NOT in WinAnsiEncoding
+// and causes pdf-lib to throw an encoding error.
+const fmt = (n: number) =>
+  Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' EUR'
+
+// Safe date formatter — avoids locale-dependent output from toLocaleDateString
+const formatDate = (iso: string) => {
+  const [year, month, day] = iso.split('-')
+  return `${parseInt(day)} ${MONTHS_FR[parseInt(month) - 1]} ${year}`
+}
 
 interface ReceiptData {
   ownerFirstName: string
@@ -39,7 +52,7 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<Uint8Array>
     y: height - 110,
     width,
     height: 110,
-    color: rgb(0.1, 0.37, 0.87),
+    color: rgb(0.02, 0.23, 0.15), // leasy-sidebar #063B26
   })
 
   // Title
@@ -51,8 +64,8 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<Uint8Array>
     color: rgb(1, 1, 1),
   })
 
-  const monthName = MONTHS_FR[data.periodMonth - 1]
-  page.drawText(`Période : ${monthName} ${data.periodYear}`, {
+  const monthName = MONTHS_FR[data.periodMonth - 1] ?? String(data.periodMonth)
+  page.drawText(`Periode : ${monthName} ${data.periodYear}`, {
     x: margin,
     y: height - 80,
     size: 12,
@@ -62,7 +75,6 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<Uint8Array>
 
   let y = height - 150
 
-  // Separator
   const drawLine = (yPos: number) => {
     page.drawLine({
       start: { x: margin, y: yPos },
@@ -77,9 +89,13 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<Uint8Array>
   y -= 20
   page.drawText(`${data.ownerFirstName} ${data.ownerLastName}`, { x: margin, y, size: 13, font: helveticaBold, color: rgb(0.1, 0.15, 0.25) })
   y -= 18
-  page.drawText(`${data.ownerAddress}`, { x: margin, y, size: 11, font: helvetica, color: rgb(0.3, 0.35, 0.45) })
-  y -= 16
-  page.drawText(`${data.ownerPostalCode} ${data.ownerCity}`, { x: margin, y, size: 11, font: helvetica, color: rgb(0.3, 0.35, 0.45) })
+  if (data.ownerAddress) {
+    page.drawText(data.ownerAddress, { x: margin, y, size: 11, font: helvetica, color: rgb(0.3, 0.35, 0.45) })
+    y -= 16
+  }
+  if (data.ownerPostalCode || data.ownerCity) {
+    page.drawText(`${data.ownerPostalCode} ${data.ownerCity}`.trim(), { x: margin, y, size: 11, font: helvetica, color: rgb(0.3, 0.35, 0.45) })
+  }
 
   y -= 30
   drawLine(y)
@@ -94,10 +110,10 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<Uint8Array>
   drawLine(y)
   y -= 25
 
-  // Section: Bien loué
-  page.drawText('BIEN LOUÉ', { x: margin, y, size: 9, font: helveticaBold, color: rgb(0.4, 0.5, 0.65) })
+  // Section: Bien loue
+  page.drawText('BIEN LOUE', { x: margin, y, size: 9, font: helveticaBold, color: rgb(0.4, 0.5, 0.65) })
   y -= 20
-  page.drawText(`${data.propertyAddress}`, { x: margin, y, size: 12, font: helvetica, color: rgb(0.1, 0.15, 0.25) })
+  page.drawText(data.propertyAddress, { x: margin, y, size: 12, font: helvetica, color: rgb(0.1, 0.15, 0.25) })
   y -= 16
   page.drawText(`${data.propertyPostalCode} ${data.propertyCity}`, { x: margin, y, size: 12, font: helvetica, color: rgb(0.3, 0.35, 0.45) })
 
@@ -105,44 +121,40 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<Uint8Array>
   drawLine(y)
   y -= 25
 
-  // Section: Détail du paiement
-  page.drawText('DÉTAIL DU PAIEMENT', { x: margin, y, size: 9, font: helveticaBold, color: rgb(0.4, 0.5, 0.65) })
+  // Section: Detail du paiement
+  page.drawText('DETAIL DU PAIEMENT', { x: margin, y, size: 9, font: helveticaBold, color: rgb(0.4, 0.5, 0.65) })
   y -= 25
 
   const drawRow = (label: string, amount: string, bold = false) => {
     page.drawText(label, {
-      x: margin,
-      y,
-      size: 12,
+      x: margin, y, size: 12,
       font: bold ? helveticaBold : helvetica,
       color: rgb(0.15, 0.2, 0.3),
     })
     page.drawText(amount, {
-      x: width - margin - 80,
-      y,
-      size: 12,
+      x: width - margin - 100, y, size: 12,
       font: bold ? helveticaBold : helvetica,
-      color: bold ? rgb(0.1, 0.37, 0.87) : rgb(0.15, 0.2, 0.3),
+      color: bold ? rgb(0.02, 0.23, 0.15) : rgb(0.15, 0.2, 0.3),
     })
     y -= 22
   }
 
-  drawRow('Loyer hors charges', `${data.rent.toLocaleString('fr-FR')} €`)
-  drawRow('Charges locatives', `${data.charges.toLocaleString('fr-FR')} €`)
+  drawRow('Loyer hors charges', fmt(data.rent))
+  drawRow('Charges locatives', fmt(data.charges))
 
   y -= 5
   drawLine(y)
   y -= 22
-  drawRow('TOTAL', `${(data.rent + data.charges).toLocaleString('fr-FR')} €`, true)
+  drawRow('TOTAL', fmt(data.rent + data.charges), true)
 
   y -= 30
   drawLine(y)
   y -= 30
 
-  // Certification text
-  const certText = `Je soussigné(e) ${data.ownerFirstName} ${data.ownerLastName}, propriétaire du logement désigné ci-dessus, donne quittance à ${data.tenantFirstName} ${data.tenantLastName} pour le paiement de la somme de ${(data.rent + data.charges).toLocaleString('fr-FR')} € au titre du loyer et des charges du mois de ${monthName} ${data.periodYear}.`
+  // Certification text (ASCII-safe French — no accented chars to avoid any edge case)
+  const total = fmt(data.rent + data.charges)
+  const certText = `Je soussigne(e) ${data.ownerFirstName} ${data.ownerLastName}, proprietaire du logement designe ci-dessus, donne quittance a ${data.tenantFirstName} ${data.tenantLastName} pour le paiement de la somme de ${total} au titre du loyer et des charges du mois de ${monthName} ${data.periodYear}.`
 
-  // Word wrap
   const words = certText.split(' ')
   let line = ''
   const maxWidth = width - 2 * margin
@@ -167,29 +179,16 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<Uint8Array>
   y -= 30
 
   // Issue date
-  const formattedDate = new Date(data.issueDate).toLocaleDateString('fr-FR', {
-    day: 'numeric', month: 'long', year: 'numeric'
-  })
-  page.drawText(`Émise le ${formattedDate}`, {
-    x: margin,
-    y,
-    size: 10,
+  page.drawText(`Emise le ${formatDate(data.issueDate)}`, {
+    x: margin, y, size: 10,
     font: helvetica,
     color: rgb(0.5, 0.55, 0.65),
   })
 
   // Footer
-  page.drawRectangle({
-    x: 0,
-    y: 0,
-    width,
-    height: 35,
-    color: rgb(0.96, 0.97, 0.99),
-  })
-  page.drawText('Document généré par Leasy Immobilier', {
-    x: margin,
-    y: 12,
-    size: 8,
+  page.drawRectangle({ x: 0, y: 0, width, height: 35, color: rgb(0.96, 0.97, 0.99) })
+  page.drawText('Document genere par Leasy Immobilier', {
+    x: margin, y: 12, size: 8,
     font: helvetica,
     color: rgb(0.6, 0.65, 0.75),
   })
