@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
         console.log('[receipt/generate] sending email to:', tenant.email)
         try {
           const { data: emailData, error: resendError } = await resend.emails.send({
-            from: 'Leasy Immobilier <onboarding@resend.dev>',
+            from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
             to: tenant.email,
             subject: `Quittance de loyer - ${monthLabel} ${periodYear}`,
             html: `

@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     console.log('[send-email] sending to:', receipt.tenant.email, '| subject: Quittance', monthLabel, receipt.period_year)
 
     const { data: emailData, error: resendError } = await resend.emails.send({
-      from: 'Leasy Immobilier <onboarding@resend.dev>',
+      from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
       to: receipt.tenant.email,
       subject: `Quittance de loyer - ${monthLabel} ${receipt.period_year}`,
       html: `
