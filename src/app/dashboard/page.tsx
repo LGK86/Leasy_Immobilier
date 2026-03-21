@@ -12,27 +12,22 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const currentMonth = new Date().getMonth() + 1
+  const currentYear = new Date().getFullYear()
+
   const [
     { data: profile },
     { data: properties },
     { data: tenants },
     { data: payments },
+    { data: currentMonthPayments },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('properties').select('*').eq('owner_id', user.id),
     supabase.from('tenants').select('*').eq('owner_id', user.id),
     supabase.from('rent_payments').select('*, tenant:tenants(first_name, last_name), property:properties(address)').eq('owner_id', user.id).order('created_at', { ascending: false }).limit(5),
+    supabase.from('rent_payments').select('*').eq('owner_id', user.id).eq('period_month', currentMonth).eq('period_year', currentYear),
   ])
-
-  const currentMonth = new Date().getMonth() + 1
-  const currentYear = new Date().getFullYear()
-
-  const { data: currentMonthPayments } = await supabase
-    .from('rent_payments')
-    .select('*')
-    .eq('owner_id', user.id)
-    .eq('period_month', currentMonth)
-    .eq('period_year', currentYear)
 
   const totalRent = (properties ?? []).reduce((sum, p) => sum + Number(p.monthly_rent), 0)
   const rentedCount = (properties ?? []).filter(p => p.status === 'rented').length
