@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -30,6 +31,11 @@ export default function LoginPage() {
       toast.error(error.message)
       setLoading(false)
     } else {
+      if (rememberMe) {
+        localStorage.setItem('leasy_remember_me', 'true')
+      } else {
+        localStorage.removeItem('leasy_remember_me')
+      }
       router.push('/dashboard')
       router.refresh()
     }
@@ -75,6 +81,18 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="rememberMe"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 accent-[#063B26] cursor-pointer"
+                />
+                <Label htmlFor="rememberMe" className="text-sm text-slate-600 cursor-pointer font-normal">
+                  Se souvenir de moi (7 jours)
+                </Label>
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
