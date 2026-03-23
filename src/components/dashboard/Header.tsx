@@ -14,6 +14,7 @@ import {
 import { LogOut, Settings } from 'lucide-react'
 import { useRouter as useNav } from 'next/navigation'
 import type { Profile } from '@/types/database'
+import NotificationBell from '@/components/dashboard/NotificationBell'
 
 export default function Header({ profile }: { profile: Profile | null }) {
   const router = useRouter()
@@ -36,6 +37,8 @@ export default function Header({ profile }: { profile: Profile | null }) {
   return (
     <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
       <div />
+      <div className="flex items-center gap-2">
+        {profile?.id && <NotificationBell userId={profile.id} />}
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
           <Avatar className="h-8 w-8">
@@ -59,6 +62,7 @@ export default function Header({ profile }: { profile: Profile | null }) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
     </header>
   )
 }
