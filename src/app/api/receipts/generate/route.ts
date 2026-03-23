@@ -173,6 +173,7 @@ export async function POST(request: NextRequest) {
           const { data: emailData, error: resendError } = await resend.emails.send({
             from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
             to: tenant.email,
+            cc: profile.email ? [profile.email] : undefined,
             subject: `Quittance de loyer - ${monthLabel} ${periodYear}`,
             html: `
               <p>Bonjour ${tenant.first_name} ${tenant.last_name},</p>

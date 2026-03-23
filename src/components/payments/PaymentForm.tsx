@@ -102,16 +102,49 @@ export default function PaymentForm({ payment, properties, tenants, userId, onSu
     }
 
     let error
+    let paymentId: string | undefined = payment?.id
     if (payment) {
       const res = await supabase.from('rent_payments').update(data).eq('id', payment.id)
       error = res.error
     } else {
-      const res = await supabase.from('rent_payments').insert(data)
+      const res = await supabase.from('rent_payments').insert(data).select('id').single()
       error = res.error
+      paymentId = res.data?.id
     }
 
-    if (error) toast.error('Erreur : ' + error.message)
-    else { toast.success(payment ? 'Paiement modifié' : 'Paiement enregistré'); onSuccess() }
+    if (error) {
+      toast.error('Erreur : ' + error.message)
+      setLoading(false)
+      return
+    }
+
+    toast.success(payment ? 'Paiement modifié' : 'Paiement enregistré')
+
+    if (form.status === 'received' && paymentId) {
+      try {
+        const res = await fetch('/api/receipts/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentId,
+            propertyId: form.property_id,
+            tenantId: form.tenant_id,
+            periodMonth: parseInt(form.period_month),
+            periodYear: parseInt(form.period_year),
+            sendEmail: true,
+          }),
+        })
+        if (res.ok) {
+          toast.success('Quittance générée et envoyée au locataire')
+        } else {
+          toast.warning('Paiement enregistré mais erreur lors de la génération de la quittance')
+        }
+      } catch {
+        toast.warning('Paiement enregistré mais erreur lors de la génération de la quittance')
+      }
+    }
+
+    onSuccess()
     setLoading(false)
   }
 
