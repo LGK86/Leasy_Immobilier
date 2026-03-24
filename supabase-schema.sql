@@ -77,6 +77,9 @@ create table if not exists public.tenants (
   phone text,
   entry_date date,
   lease_end_date date,
+  status text default 'active' check (status in ('active', 'inactive')),
+  tacite_reconduction boolean default false,
+  notes text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -98,7 +101,7 @@ create table if not exists public.rent_payments (
   payment_date date,
   period_month integer not null check (period_month between 1 and 12),
   period_year integer not null,
-  status text check (status in ('paid','pending','late')) default 'pending',
+  status text check (status in ('received','pending_validation','late','paid','pending')) default 'pending',
   notes text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
