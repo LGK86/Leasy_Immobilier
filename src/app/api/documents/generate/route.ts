@@ -65,22 +65,40 @@ export async function POST(request: NextRequest) {
 
   await supabase.from('documents').update(updates).eq('id', documentId)
 
-  if (sendEmail && doc.tenant?.email && process.env.RESEND_API_KEY) {
-    await resend.emails.send({
-      from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
-      to: doc.tenant.email,
-      cc: profile?.email ? [profile.email] : undefined,
-      subject: `Votre document signé - ${doc.title}`,
-      html: `
-        <p>Bonjour ${doc.tenant.first_name},</p>
-        <p>Veuillez trouver ci-joint votre document signé par les deux parties.</p>
-        <p>Cordialement,<br/>Leasy Immobilier</p>
-      `,
-      attachments: [{
-        filename: `${doc.title.toLowerCase().replace(/\s+/g, '_')}.pdf`,
-        content: Buffer.from(pdfBytes).toString('base64'),
-      }],
-    })
+  if (sendEmail && process.env.RESEND_API_KEY) {
+    const hasTenant = !!doc.tenant?.email
+    const to = hasTenant ? doc.tenant.email : profile?.email
+    const cc = hasTenant && profile?.email ? [profile.email] : undefined
+    const greeting = hasTenant ? `Bonjour ${doc.tenant.first_name},` : `Bonjour,`
+
+    if (to) {
+      await resend.emails.send({
+        from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
+        to,
+        cc,
+        subject: `Document signé - ${doc.title}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #063B26; padding: 24px; border-radius: 8px 8px 0 0;">
+              <h1 style="color: #CFFF92; margin: 0; font-size: 20px;">Leasy Immobilier</h1>
+            </div>
+            <div style="padding: 32px; background: #ffffff; border: 1px solid #e5e7eb;">
+              <p style="color: #374151; font-size: 16px;">${greeting}</p>
+              <p style="color: #374151;">Veuillez trouver ci-joint le document <strong>${doc.title}</strong>, signé par les deux parties.</p>
+              <p style="color: #374151;">Conservez ce document pour vos archives.</p>
+              <p style="color: #374151;">Cordialement,<br/>Leasy Immobilier</p>
+            </div>
+            <div style="background-color: #F5F6F4; padding: 16px; border-radius: 0 0 8px 8px; text-align: center;">
+              <p style="color: #9ca3af; font-size: 12px; margin: 0;">Leasy Immobilier — noreply@leasy-immo.fr</p>
+            </div>
+          </div>
+        `,
+        attachments: [{
+          filename: `${doc.title.toLowerCase().replace(/\s+/g, '_')}.pdf`,
+          content: Buffer.from(pdfBytes).toString('base64'),
+        }],
+      })
+    }
   }
 
   return NextResponse.json({ success: true, filePath: fileName })

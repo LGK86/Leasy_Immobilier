@@ -60,15 +60,31 @@ export async function POST(req: Request) {
     to: doc.tenant.email,
     subject: `Signature requise : ${doc.title}`,
     html: `
-      <p>Bonjour ${tenantName},</p>
-      <p>Votre bailleur vous invite à signer le document suivant :</p>
-      <p><strong>${doc.title}</strong>${propertyAddress ? ` — ${propertyAddress}` : ''}</p>
-      <p>
-        <a href="${signingUrl}" style="display:inline-block;background:#CFFF92;color:#063B26;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
-          Signer le document
-        </a>
-      </p>
-      <p style="color:#888;font-size:12px;">Ce lien expire dans 7 jours.</p>
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #063B26; padding: 24px; border-radius: 8px 8px 0 0;">
+          <h1 style="color: #CFFF92; margin: 0; font-size: 20px;">Leasy Immobilier</h1>
+        </div>
+        <div style="padding: 32px; background: #ffffff; border: 1px solid #e5e7eb;">
+          <p style="color: #374151; font-size: 16px;">Bonjour ${tenantName},</p>
+          <p style="color: #374151;">Votre bailleur vous invite à signer le document suivant :</p>
+          <p style="color: #063B26; font-weight: bold; font-size: 18px;">${doc.title}${propertyAddress ? ` — ${propertyAddress}` : ''}</p>
+          <p style="color: #6b7280; font-size: 14px;">Cliquez sur le bouton ci-dessous pour consulter et signer votre document en ligne :</p>
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${signingUrl}"
+               style="background-color: #CFFF92; color: #063B26; padding: 16px 32px;
+                      border-radius: 8px; text-decoration: none; font-weight: bold;
+                      font-size: 16px; display: inline-block;">
+              ✍️ Signer le document
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 12px;">Ou copiez ce lien dans votre navigateur :</p>
+          <p style="color: #063B26; font-size: 12px; word-break: break-all;">${signingUrl}</p>
+          <p style="color: #6b7280; font-size: 12px;">Ce lien est valable 7 jours.</p>
+        </div>
+        <div style="background-color: #F5F6F4; padding: 16px; border-radius: 0 0 8px 8px; text-align: center;">
+          <p style="color: #9ca3af; font-size: 12px; margin: 0;">Leasy Immobilier — noreply@leasy-immo.fr</p>
+        </div>
+      </div>
     `,
   })
 

@@ -137,7 +137,7 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
         email: newTenant.email,
         phone: newTenant.phone || null,
         property_id: propertyId || null,
-        status: 'draft',
+        status: 'active',
         updated_at: new Date().toISOString(),
       })
       .select('id, first_name, last_name, property_id')
