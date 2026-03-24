@@ -11,6 +11,7 @@ create table if not exists public.profiles (
   address text,
   city text,
   postal_code text,
+  blocked boolean default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -186,3 +187,12 @@ alter table public.notifications enable row level security;
 create policy "Owners can manage own notifications"
   on public.notifications for all
   using (auth.uid() = owner_id);
+
+-- ADMIN USERS
+create table if not exists public.admin_users (
+  id uuid default uuid_generate_v4() primary key,
+  email text not null unique,
+  created_at timestamptz default now()
+);
+
+-- Pas de RLS sur admin_users — accès via service role uniquement
