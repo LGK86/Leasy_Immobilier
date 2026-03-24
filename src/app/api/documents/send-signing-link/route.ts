@@ -1,35 +1,28 @@
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
 import { Resend } from 'resend'
 import { randomUUID } from 'crypto'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 export async function POST(req: Request) {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  )
+  const resend = new Resend(process.env.RESEND_API_KEY)
 
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { documentId } = await req.json()
   if (!documentId) return NextResponse.json({ error: 'Missing documentId' }, { status: 400 })
 
-  const serviceClient = createServiceClient(
+  const serviceSupabase = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SECRET_KEY!
   )
 
   // Fetch document with tenant info
-  const { data: doc, error: docErr } = await serviceClient
+  const { data: doc, error: docErr } = await serviceSupabase
     .from('documents')
     .select('*, tenant:tenants(*), property:properties(*)')
     .eq('id', documentId)
@@ -46,7 +39,7 @@ export async function POST(req: Request) {
   const token = randomUUID()
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  const { error: updateErr } = await serviceClient
+  const { error: updateErr } = await serviceSupabase
     .from('documents')
     .update({
       signing_token: token,
