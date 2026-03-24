@@ -175,6 +175,7 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
                 <div key={key} className="space-y-1">
                   <label className="text-xs font-medium text-slate-500">{key}</label>
                   <Input
+                    type={key.toLowerCase().includes('date') ? 'date' : 'text'}
                     value={value}
                     onChange={(e) => setContent(prev => ({ ...prev, [key]: e.target.value }))}
                     className="text-sm"

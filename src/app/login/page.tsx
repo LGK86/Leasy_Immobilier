@@ -82,7 +82,7 @@ export default function LoginPage() {
                   required
                 />
               </div>
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-6">
                 <input
                   id="rememberMe"
                   type="checkbox"

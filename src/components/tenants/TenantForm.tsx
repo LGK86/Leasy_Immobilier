@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
@@ -84,6 +84,8 @@ export default function TenantForm({ tenant, properties, userId, onSuccess }: Pr
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [key]: e.target.value }))
 
+  const selectedProperty = properties.find(p => p.id === form.property_id)
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
@@ -108,7 +110,11 @@ export default function TenantForm({ tenant, properties, userId, onSuccess }: Pr
         <Label>Bien associé</Label>
         <Select value={form.property_id || undefined} onValueChange={(v) => setForm(f => ({ ...f, property_id: v ?? '' }))}>
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Sélectionner un bien" />
+            <span className="flex-1 text-left truncate text-sm">
+              {selectedProperty
+                ? `${selectedProperty.address}, ${selectedProperty.city}`
+                : <span className="text-muted-foreground">Sélectionner un bien</span>}
+            </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">Aucun</SelectItem>

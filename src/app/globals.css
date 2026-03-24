@@ -6,6 +6,15 @@
   .text-balance { text-wrap: balance; }
 }
 
+input:not(:placeholder-shown):not([type="checkbox"]):not([type="radio"]):not([type="date"]) {
+  border-color: rgba(6, 59, 38, 0.4);
+}
+
+input[type="date"]:not(:placeholder-shown),
+input[type="date"][value]:not([value=""]) {
+  border-color: rgba(6, 59, 38, 0.4);
+}
+
 @layer base {
   :root {
     --background: #F5F6F4;

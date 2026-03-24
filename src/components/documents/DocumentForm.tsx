@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -54,6 +54,23 @@ interface Props {
   tenants: { id: string; first_name: string; last_name: string; property_id: string | null }[]
   userId: string
   onSuccess: (doc?: any) => void
+}
+
+const typeLabels: Record<string, string> = {
+  lease: 'Contrat de bail',
+  entry_inspection: "État des lieux d'entrée",
+  exit_inspection: "État des lieux de sortie",
+  inventory: 'Inventaire du mobilier',
+}
+
+function TriggerLabel({ value, placeholder }: { value?: string; placeholder: string }) {
+  return (
+    <span className="flex-1 text-left truncate text-sm">
+      {value !== undefined && value !== ''
+        ? value
+        : <span className="text-muted-foreground">{placeholder}</span>}
+    </span>
+  )
 }
 
 export default function DocumentForm({ properties, tenants, userId, onSuccess }: Props) {
@@ -117,7 +134,9 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
         <div className="space-y-2">
           <Label>Type de document</Label>
           <Select value={docType} onValueChange={handleTypeChange}>
-            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full">
+              <TriggerLabel value={typeLabels[docType]} placeholder="Type de document" />
+            </SelectTrigger>
             <SelectContent>
               {docTypes.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
             </SelectContent>
@@ -137,16 +156,26 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
         <div className="space-y-2">
           <Label>Bien</Label>
           <Select value={propertyId || undefined} onValueChange={(v) => { setPropertyId(v ?? ''); setTenantId('') }}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+            <SelectTrigger className="w-full">
+              <TriggerLabel
+                value={properties.find(p => p.id === propertyId) ? `${properties.find(p => p.id === propertyId)!.address}, ${properties.find(p => p.id === propertyId)!.city}` : undefined}
+                placeholder="Sélectionner un bien"
+              />
+            </SelectTrigger>
             <SelectContent>
-              {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.address}</SelectItem>)}
+              {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.address}, {p.city}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
           <Label>Locataire (optionnel)</Label>
           <Select value={tenantId || undefined} onValueChange={(v) => setTenantId(v ?? '')}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+            <SelectTrigger className="w-full">
+              <TriggerLabel
+                value={filteredTenants.find(t => t.id === tenantId) ? `${filteredTenants.find(t => t.id === tenantId)!.first_name} ${filteredTenants.find(t => t.id === tenantId)!.last_name}` : undefined}
+                placeholder="Aucun"
+              />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="">Aucun</SelectItem>
               {filteredTenants.map(t => (
@@ -166,6 +195,7 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
               <div key={f.key} className="space-y-1">
                 <Label className="text-xs">{f.label}</Label>
                 <Input
+                  type={f.key.includes('_date') || f.key === 'start_date' ? 'date' : 'text'}
                   placeholder={f.label}
                   value={values[f.key] ?? ''}
                   onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
