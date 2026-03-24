@@ -53,7 +53,7 @@ interface Props {
   properties: { id: string; address: string; city: string }[]
   tenants: { id: string; first_name: string; last_name: string; property_id: string | null }[]
   userId: string
-  onSuccess: () => void
+  onSuccess: (doc?: any) => void
 }
 
 export default function DocumentForm({ properties, tenants, userId, onSuccess }: Props) {
@@ -92,18 +92,22 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
       if (values[f.key]) content[f.label] = values[f.key]
     }
 
-    const { error } = await supabase.from('documents').insert({
-      owner_id: userId,
-      property_id: propertyId,
-      tenant_id: tenantId || null,
-      type: docType,
-      title: title || (docTypes.find(d => d.value === docType)?.label ?? 'Document'),
-      content,
-      status: 'draft',
-    })
+    const { data: inserted, error } = await supabase
+      .from('documents')
+      .insert({
+        owner_id: userId,
+        property_id: propertyId,
+        tenant_id: tenantId || null,
+        type: docType,
+        title: title || (docTypes.find(d => d.value === docType)?.label ?? 'Document'),
+        content,
+        status: 'draft',
+      })
+      .select('*, property:properties(*), tenant:tenants(*)')
+      .single()
 
     if (error) toast.error('Erreur : ' + error.message)
-    else { toast.success('Document créé'); onSuccess() }
+    else { toast.success('Document créé'); onSuccess(inserted) }
     setLoading(false)
   }
 

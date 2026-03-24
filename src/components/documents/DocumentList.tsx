@@ -182,7 +182,7 @@ export default function DocumentList({ documents, properties, tenants, userId }:
             properties={properties}
             tenants={tenants}
             userId={userId}
-            onSuccess={() => { setOpenForm(false); router.refresh() }}
+            onSuccess={(doc) => { setOpenForm(false); router.refresh(); if (doc) setOpenDetail(doc) }}
           />
         </DialogContent>
       </Dialog>
