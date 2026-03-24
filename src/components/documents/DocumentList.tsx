@@ -27,6 +27,7 @@ const statusConfig = {
   draft: { label: 'Brouillon', variant: 'secondary' as const, className: '' },
   sent: { label: 'Envoyé', variant: 'default' as const, className: 'bg-blue-100 text-blue-700 hover:bg-blue-100' },
   signed: { label: 'Signé', variant: 'default' as const, className: 'bg-amber-100 text-amber-700 hover:bg-amber-100' },
+  pending_tenant_signature: { label: 'En attente signature locataire', variant: 'default' as const, className: 'bg-purple-100 text-purple-700 hover:bg-purple-100' },
   finalized: { label: 'Finalisé', variant: 'default' as const, className: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100' },
 }
 
@@ -120,7 +121,7 @@ export default function DocumentList({ documents, properties, tenants, userId }:
               </TableHeader>
               <TableBody>
                 {documents.map((doc) => {
-                  const sc = statusConfig[doc.status as keyof typeof statusConfig]
+                  const sc = statusConfig[doc.status as keyof typeof statusConfig] ?? { label: doc.status, variant: 'secondary' as const, className: '' }
                   return (
                     <TableRow key={doc.id}>
                       <TableCell className="font-medium">{doc.title}</TableCell>

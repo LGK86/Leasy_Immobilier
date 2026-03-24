@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/u
 import { Separator } from '@/components/ui/separator'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Trash2, X, UserPlus, ChevronDown, ChevronUp } from 'lucide-react'
 
 const docTypes = [
   { value: 'lease', label: 'Contrat de bail' },
@@ -73,16 +73,29 @@ function TriggerLabel({ value, placeholder }: { value?: string; placeholder: str
   )
 }
 
+interface NewTenantForm {
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+}
+
 export default function DocumentForm({ properties, tenants, userId, onSuccess }: Props) {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [docType, setDocType] = useState('lease')
   const [propertyId, setPropertyId] = useState('')
-  const [tenantId, setTenantId] = useState('')
+  const [tenantIds, setTenantIds] = useState<string[]>([])
   const [title, setTitle] = useState('Contrat de bail')
   const [fields, setFields] = useState(defaultFields['lease'])
   const [values, setValues] = useState<Record<string, string>>({})
   const [customFields, setCustomFields] = useState<{ key: string; label: string }[]>([])
+
+  // Inline tenant creation
+  const [showNewTenantForm, setShowNewTenantForm] = useState(false)
+  const [newTenant, setNewTenant] = useState<NewTenantForm>({ first_name: '', last_name: '', email: '', phone: '' })
+  const [creatingTenant, setCreatingTenant] = useState(false)
+  const [localTenants, setLocalTenants] = useState(tenants)
 
   const handleTypeChange = (type: string | null) => {
     if (!type) return
@@ -94,10 +107,52 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
     setTitle(label)
   }
 
-  const filteredTenants = tenants.filter(t => !propertyId || t.property_id === propertyId)
+  const filteredTenants = localTenants.filter(t => !propertyId || t.property_id === propertyId || t.property_id === null)
+
+  const addTenant = (id: string) => {
+    if (!id || tenantIds.includes(id)) return
+    setTenantIds(prev => [...prev, id])
+  }
+
+  const removeTenant = (id: string) => {
+    setTenantIds(prev => prev.filter(t => t !== id))
+  }
 
   const addCustomField = () => {
     setCustomFields(f => [...f, { key: `custom_${Date.now()}`, label: 'Nouveau champ' }])
+  }
+
+  const handleCreateTenant = async () => {
+    if (!newTenant.first_name || !newTenant.last_name || !newTenant.email) {
+      toast.error('Prénom, nom et email sont requis')
+      return
+    }
+    setCreatingTenant(true)
+    const { data, error } = await supabase
+      .from('tenants')
+      .insert({
+        owner_id: userId,
+        first_name: newTenant.first_name,
+        last_name: newTenant.last_name,
+        email: newTenant.email,
+        phone: newTenant.phone || null,
+        property_id: propertyId || null,
+        status: 'draft',
+        updated_at: new Date().toISOString(),
+      })
+      .select('id, first_name, last_name, property_id')
+      .single()
+
+    if (error) {
+      toast.error('Erreur : ' + error.message)
+    } else if (data) {
+      setLocalTenants(prev => [...prev, { ...data, property_id: data.property_id ?? null }])
+      setTenantIds(prev => [...prev, data.id])
+      setNewTenant({ first_name: '', last_name: '', email: '', phone: '' })
+      setShowNewTenantForm(false)
+      toast.success('Locataire créé et ajouté')
+    }
+    setCreatingTenant(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,12 +164,17 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
       if (values[f.key]) content[f.label] = values[f.key]
     }
 
+    // Store additional tenant ids in content if more than one
+    if (tenantIds.length > 1) {
+      content['_tenant_ids'] = tenantIds.join(',')
+    }
+
     const { data: inserted, error } = await supabase
       .from('documents')
       .insert({
         owner_id: userId,
         property_id: propertyId,
-        tenant_id: tenantId || null,
+        tenant_id: tenantIds[0] || null,
         type: docType,
         title: title || (docTypes.find(d => d.value === docType)?.label ?? 'Document'),
         content,
@@ -152,38 +212,127 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label>Bien</Label>
-          <Select value={propertyId || undefined} onValueChange={(v) => { setPropertyId(v ?? ''); setTenantId('') }}>
-            <SelectTrigger className="w-full">
-              <TriggerLabel
-                value={properties.find(p => p.id === propertyId) ? `${properties.find(p => p.id === propertyId)!.address}, ${properties.find(p => p.id === propertyId)!.city}` : undefined}
-                placeholder="Sélectionner un bien"
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.address}, {p.city}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Locataire (optionnel)</Label>
-          <Select value={tenantId || undefined} onValueChange={(v) => setTenantId(v ?? '')}>
-            <SelectTrigger className="w-full">
-              <TriggerLabel
-                value={filteredTenants.find(t => t.id === tenantId) ? `${filteredTenants.find(t => t.id === tenantId)!.first_name} ${filteredTenants.find(t => t.id === tenantId)!.last_name}` : undefined}
-                placeholder="Aucun"
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Aucun</SelectItem>
-              {filteredTenants.map(t => (
+      <div className="space-y-2">
+        <Label>Bien</Label>
+        <Select value={propertyId || undefined} onValueChange={(v) => { setPropertyId(v ?? ''); setTenantIds([]) }}>
+          <SelectTrigger className="w-full">
+            <TriggerLabel
+              value={properties.find(p => p.id === propertyId) ? `${properties.find(p => p.id === propertyId)!.address}, ${properties.find(p => p.id === propertyId)!.city}` : undefined}
+              placeholder="Sélectionner un bien"
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.address}, {p.city}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Multi-tenant section */}
+      <div className="space-y-2">
+        <Label>Locataires</Label>
+
+        {/* Selected tenants list */}
+        {tenantIds.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {tenantIds.map(id => {
+              const t = localTenants.find(t => t.id === id)
+              if (!t) return null
+              return (
+                <div key={id} className="flex items-center gap-1 bg-slate-100 text-slate-700 text-sm px-2 py-1 rounded-full">
+                  <span>{t.first_name} {t.last_name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeTenant(id)}
+                    className="text-slate-400 hover:text-red-500 transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Add existing tenant */}
+        <Select onValueChange={(v) => { if (typeof v === 'string' && v) addTenant(v) }}>
+          <SelectTrigger className="w-full">
+            <TriggerLabel placeholder="Ajouter un locataire existant" />
+          </SelectTrigger>
+          <SelectContent>
+            {filteredTenants
+              .filter(t => !tenantIds.includes(t.id))
+              .map(t => (
                 <SelectItem key={t.id} value={t.id}>{t.first_name} {t.last_name}</SelectItem>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
+          </SelectContent>
+        </Select>
+
+        {/* Toggle inline creation */}
+        <button
+          type="button"
+          onClick={() => setShowNewTenantForm(v => !v)}
+          className="flex items-center gap-1.5 text-sm text-[#063B26] hover:underline font-medium mt-1"
+        >
+          <UserPlus className="h-4 w-4" />
+          Créer un nouveau locataire
+          {showNewTenantForm ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+
+        {showNewTenantForm && (
+          <div className="border border-slate-200 rounded-lg p-3 space-y-3 bg-slate-50">
+            <p className="text-xs font-medium text-slate-600">Nouveau locataire</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Prénom *</Label>
+                <Input
+                  placeholder="Jean"
+                  value={newTenant.first_name}
+                  onChange={e => setNewTenant(n => ({ ...n, first_name: e.target.value }))}
+                  className="text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Nom *</Label>
+                <Input
+                  placeholder="Dupont"
+                  value={newTenant.last_name}
+                  onChange={e => setNewTenant(n => ({ ...n, last_name: e.target.value }))}
+                  className="text-sm"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Email *</Label>
+              <Input
+                type="email"
+                placeholder="jean@exemple.com"
+                value={newTenant.email}
+                onChange={e => setNewTenant(n => ({ ...n, email: e.target.value }))}
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Téléphone</Label>
+              <Input
+                placeholder="06 12 34 56 78"
+                value={newTenant.phone}
+                onChange={e => setNewTenant(n => ({ ...n, phone: e.target.value }))}
+                className="text-sm"
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleCreateTenant}
+              disabled={creatingTenant}
+              className="text-[#063B26] font-semibold"
+              style={{ backgroundColor: '#CFFF92' }}
+            >
+              {creatingTenant ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+              Créer et ajouter
+            </Button>
+          </div>
+        )}
       </div>
 
       {(fields.length > 0 || customFields.length > 0) && (

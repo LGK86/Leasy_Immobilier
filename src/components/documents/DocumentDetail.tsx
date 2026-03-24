@@ -17,10 +17,11 @@ const typeLabels = {
 }
 
 const statusConfig = {
-  draft:     { label: 'Brouillon', color: 'secondary' as const },
-  sent:      { label: 'Envoyé',    color: 'default' as const },
-  signed:    { label: 'Signé',     color: 'default' as const },
-  finalized: { label: 'Finalisé',  color: 'default' as const },
+  draft:                    { label: 'Brouillon',                       color: 'secondary' as const },
+  sent:                     { label: 'Envoyé',                          color: 'default' as const },
+  signed:                   { label: 'Signé',                           color: 'default' as const },
+  pending_tenant_signature: { label: 'En attente signature locataire',  color: 'default' as const },
+  finalized:                { label: 'Finalisé',                        color: 'default' as const },
 }
 
 interface Props {
@@ -131,17 +132,17 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
     setLoading(false)
   }
 
-  /* ── Step 3 : send to tenant ─────────────────────────────── */
+  /* ── Step 3 : send signing link to tenant ────────────────── */
   const handleSend = async () => {
     setSending(true)
     try {
-      const res = await fetch('/api/documents/generate', {
+      const res = await fetch('/api/documents/send-signing-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentId: doc.id, sendEmail: true }),
+        body: JSON.stringify({ documentId: doc.id }),
       })
       if (res.ok) {
-        toast.success('Document envoyé au locataire')
+        toast.success('Lien de signature envoyé au locataire')
         onSigned()
       } else {
         toast.error("Erreur lors de l'envoi")
@@ -255,7 +256,12 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
             </div>
           )}
 
-          {doc.sent_at ? (
+          {doc.status === 'pending_tenant_signature' ? (
+            <div className="flex items-center gap-2 bg-purple-50 rounded-lg p-3 text-sm text-purple-700">
+              <Clock className="h-4 w-4 text-purple-400 flex-shrink-0" />
+              Lien de signature déjà envoyé — en attente de la signature du locataire
+            </div>
+          ) : doc.sent_at ? (
             <div className="flex items-center gap-2 bg-slate-50 rounded-lg p-3 text-sm text-slate-600">
               <Clock className="h-4 w-4 text-slate-400 flex-shrink-0" />
               Document déjà envoyé le{' '}
@@ -265,12 +271,12 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
             </div>
           ) : (
             <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-600">
-              Votre bail est signé. Souhaitez-vous l&apos;envoyer au locataire ?
+              Votre bail est signé. Envoyez le lien de signature au locataire.
             </div>
           )}
 
           <div className="flex gap-2">
-            {!doc.sent_at && (
+            {doc.status !== 'pending_tenant_signature' && !doc.sent_at && (
               <Button
                 onClick={handleSend}
                 disabled={sending}
@@ -281,11 +287,11 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
                   ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   : <Send className="h-4 w-4 mr-2" />
                 }
-                Envoyer au locataire
+                Envoyer le lien de signature
               </Button>
             )}
             <Button variant="outline" onClick={onSigned} className="flex-1">
-              {doc.sent_at ? 'Fermer' : 'Plus tard'}
+              {doc.status === 'pending_tenant_signature' || doc.sent_at ? 'Fermer' : 'Plus tard'}
             </Button>
           </div>
 

@@ -31,7 +31,7 @@ export default function Header({ profile }: { profile: Profile | null }) {
     : 'U'
 
   const displayName = profile
-    ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || profile.email
+    ? `${profile.first_name ?? ''} ${(profile.last_name ?? '').toUpperCase()}`.trim() || profile.email
     : 'Utilisateur'
 
   return (
