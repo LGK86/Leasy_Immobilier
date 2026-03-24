@@ -69,11 +69,12 @@ export async function POST(request: NextRequest) {
     await resend.emails.send({
       from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
       to: doc.tenant.email,
-      subject: `Document à signer : ${doc.title}`,
+      cc: profile?.email ? [profile.email] : undefined,
+      subject: `Votre document signé - ${doc.title}`,
       html: `
         <p>Bonjour ${doc.tenant.first_name},</p>
-        <p>Veuillez trouver ci-joint le document "${doc.title}" qui nécessite votre signature.</p>
-        <p>Cordialement,<br/>${profile?.first_name} ${profile?.last_name}</p>
+        <p>Veuillez trouver ci-joint votre document signé par les deux parties.</p>
+        <p>Cordialement,<br/>Leasy Immobilier</p>
       `,
       attachments: [{
         filename: `${doc.title.toLowerCase().replace(/\s+/g, '_')}.pdf`,

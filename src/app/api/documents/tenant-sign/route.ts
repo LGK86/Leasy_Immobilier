@@ -3,10 +3,11 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
+import { generateDocumentPDF } from '@/lib/pdf/document'
 
 export async function POST(req: Request) {
+  const resend = new Resend(process.env.RESEND_API_KEY)
+
   const { token, signature } = await req.json()
   if (!token || !signature) {
     return NextResponse.json({ error: 'Missing token or signature' }, { status: 400 })
@@ -50,12 +51,55 @@ export async function POST(req: Request) {
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
-  // Generate PDF
-  await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/documents/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ documentId: doc.id }),
-  }).catch(() => {})
+  // Generate final PDF with both signatures
+  try {
+    const owner = doc.owner
+    const pdfBytes = await generateDocumentPDF({
+      type: doc.type,
+      title: doc.title,
+      ownerName: `${owner?.first_name ?? ''} ${owner?.last_name ?? ''}`.trim(),
+      ownerAddress: `${owner?.address ?? ''}, ${owner?.postal_code ?? ''} ${owner?.city ?? ''}`,
+      tenantName: doc.tenant ? `${doc.tenant.first_name} ${doc.tenant.last_name}` : '',
+      propertyAddress: doc.property?.address ?? '',
+      propertyCity: doc.property?.city ?? '',
+      propertyPostalCode: doc.property?.postal_code ?? '',
+      content: doc.content ?? {},
+      ownerSignature: doc.owner_signature,
+      tenantSignature: signature,
+      date: doc.created_at,
+    })
+
+    const fileName = `${doc.owner_id}/documents/${doc.id}.pdf`
+    await serviceClient.storage
+      .from('documents')
+      .upload(fileName, pdfBytes, { contentType: 'application/pdf', upsert: true })
+
+    await serviceClient
+      .from('documents')
+      .update({ file_path: fileName, updated_at: new Date().toISOString() })
+      .eq('id', doc.id)
+
+    // Send signed PDF to tenant + CC owner
+    const recipients: string[] = []
+    if (doc.tenant?.email) recipients.push(doc.tenant.email)
+    if (recipients.length > 0) {
+      await resend.emails.send({
+        from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
+        to: recipients,
+        cc: owner?.email ? [owner.email] : undefined,
+        subject: `Votre document signé - ${doc.title}`,
+        html: `
+          <p>Bonjour,</p>
+          <p>Veuillez trouver ci-joint votre document signé par les deux parties.</p>
+          <p>Cordialement,<br/>Leasy Immobilier</p>
+        `,
+        attachments: [{
+          filename: `${doc.title.toLowerCase().replace(/\s+/g, '_')}.pdf`,
+          content: Buffer.from(pdfBytes).toString('base64'),
+        }],
+      })
+    }
+  } catch { /* ignore PDF/email errors — signature is already saved */ }
 
   // Insert notification for owner
   try {
@@ -67,21 +111,6 @@ export async function POST(req: Request) {
       metadata: { document_id: doc.id },
     })
   } catch { /* ignore */ }
-
-  // Email owner
-  if (doc.owner?.email) {
-    const tenantName = `${doc.tenant?.first_name ?? ''} ${doc.tenant?.last_name ?? ''}`.trim()
-    await resend.emails.send({
-      from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
-      to: doc.owner.email,
-      subject: `Document signé : ${doc.title}`,
-      html: `
-        <p>Bonjour,</p>
-        <p>Le document <strong>${doc.title}</strong> a été signé par <strong>${tenantName}</strong>.</p>
-        <p>Connectez-vous à votre espace Leasy Immobilier pour le télécharger.</p>
-      `,
-    }).catch(() => {})
-  }
 
   return NextResponse.json({ success: true })
 }
