@@ -159,15 +159,13 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
     e.preventDefault()
     setLoading(true)
 
-    const content: Record<string, string> = {}
+    const content: Record<string, string | string[]> = {}
     for (const f of [...fields, ...customFields]) {
       if (values[f.key]) content[f.label] = values[f.key]
     }
 
-    // Store additional tenant ids in content if more than one
-    if (tenantIds.length > 1) {
-      content['_tenant_ids'] = tenantIds.join(',')
-    }
+    // Always store tenant_ids as a proper array in content
+    content['tenant_ids'] = [...tenantIds]
 
     const { data: inserted, error } = await supabase
       .from('documents')
