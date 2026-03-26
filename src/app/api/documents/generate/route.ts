@@ -26,18 +26,39 @@ export async function POST(request: NextRequest) {
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
 
+  // Resolve all tenant IDs
+  let tenantIds: string[] = []
+  const rawTenantIds = doc.content?.tenant_ids
+  if (Array.isArray(rawTenantIds)) {
+    tenantIds = rawTenantIds
+  } else if (typeof rawTenantIds === 'string' && rawTenantIds.length > 0) {
+    tenantIds = rawTenantIds.split(',').map((id: string) => id.trim()).filter(Boolean)
+  }
+  if (tenantIds.length === 0 && doc.tenant_id) {
+    tenantIds = [doc.tenant_id]
+  }
+
+  const { data: pdfTenants } = tenantIds.length > 0
+    ? await supabase.from('tenants').select('id, first_name, last_name').in('id', tenantIds)
+    : { data: [] }
+
+  const tenantSignatures: Record<string, string> = doc.content?.tenant_signatures ?? {}
+  const tenants = (pdfTenants ?? []).map(t => ({
+    name: `${t.first_name} ${t.last_name}`,
+    signature: tenantSignatures[t.id] ?? doc.tenant_signature ?? null,
+  }))
+
   const pdfBytes = await generateDocumentPDF({
     type: doc.type,
     title: doc.title,
     ownerName: `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim(),
     ownerAddress: `${profile?.address ?? ''}, ${profile?.postal_code ?? ''} ${profile?.city ?? ''}`,
-    tenantName: doc.tenant ? `${doc.tenant.first_name} ${doc.tenant.last_name}` : '',
+    tenants,
     propertyAddress: doc.property?.address ?? '',
     propertyCity: doc.property?.city ?? '',
     propertyPostalCode: doc.property?.postal_code ?? '',
     content: doc.content ?? {},
     ownerSignature: doc.owner_signature,
-    tenantSignature: doc.tenant_signature,
     date: doc.created_at,
   })
 

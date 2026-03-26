@@ -80,18 +80,29 @@ export async function POST(req: Request) {
     // Generate final PDF with both signatures and send to all tenants
     try {
       const owner = doc.owner
+
+      // Fetch all tenants for PDF
+      const { data: pdfTenants } = await serviceClient
+        .from('tenants')
+        .select('id, first_name, last_name')
+        .in('id', allTenantIds)
+
+      const tenants = (pdfTenants ?? []).map(t => ({
+        name: `${t.first_name} ${t.last_name}`,
+        signature: newSignatures[t.id] ?? null,
+      }))
+
       const pdfBytes = await generateDocumentPDF({
         type: doc.type,
         title: doc.title,
         ownerName: `${owner?.first_name ?? ''} ${owner?.last_name ?? ''}`.trim(),
         ownerAddress: `${owner?.address ?? ''}, ${owner?.postal_code ?? ''} ${owner?.city ?? ''}`,
-        tenantName: doc.tenant ? `${doc.tenant.first_name} ${doc.tenant.last_name}` : '',
+        tenants,
         propertyAddress: doc.property?.address ?? '',
         propertyCity: doc.property?.city ?? '',
         propertyPostalCode: doc.property?.postal_code ?? '',
         content: updatedContent,
         ownerSignature: doc.owner_signature,
-        tenantSignature: signature,
         date: doc.created_at,
       })
 
