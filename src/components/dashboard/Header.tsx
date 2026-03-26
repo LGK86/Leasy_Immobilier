@@ -54,7 +54,7 @@ export default function Header({ profile }: { profile: Profile | null }) {
             Paramètres
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleSignOut} variant="destructive" className="cursor-pointer">
+          <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-red-600">
             <LogOut className="h-4 w-4" />
             Déconnexion
           </DropdownMenuItem>
