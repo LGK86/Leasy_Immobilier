@@ -78,19 +78,13 @@ export async function POST(request: NextRequest) {
       tenantIds = [doc.tenant_id]
     }
 
-    // Fetch all tenants if multi-tenant, otherwise use the already-joined tenant
-    let allTenants: { id: string; first_name: string; last_name: string; email: string | null }[] = []
-    if (tenantIds.length > 1) {
-      const { data: fetchedTenants } = await supabase
-        .from('tenants')
-        .select('id, first_name, last_name, email')
-        .in('id', tenantIds)
-      allTenants = fetchedTenants ?? []
-    } else if (doc.tenant) {
-      allTenants = [doc.tenant]
-    }
+    // Fetch all tenants in a single query
+    const { data: allTenants } = await supabase
+      .from('tenants')
+      .select('id, first_name, last_name, email')
+      .in('id', tenantIds)
 
-    const tenantsWithEmail = allTenants.filter(t => !!t.email)
+    const tenantsWithEmail = (allTenants ?? []).filter(t => !!t.email)
     const pdfAttachment = {
       filename: `${doc.title.toLowerCase().replace(/\s+/g, '_')}.pdf`,
       content: Buffer.from(pdfBytes).toString('base64'),
