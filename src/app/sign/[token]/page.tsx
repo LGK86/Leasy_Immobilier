@@ -3,7 +3,13 @@ import SignPage from './SignPage'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SignTokenPage({ params }: { params: { token: string } }) {
+export default async function SignTokenPage({
+  params,
+  searchParams,
+}: {
+  params: { token: string }
+  searchParams: { tid?: string }
+}) {
   const serviceClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SECRET_KEY!
@@ -51,5 +57,33 @@ export default async function SignTokenPage({ params }: { params: { token: strin
     )
   }
 
-  return <SignPage doc={doc} token={params.token} />
+  // Determine signing tenant ID
+  const tenantId = searchParams.tid ?? doc.tenant_id ?? null
+
+  // Check if this specific tenant has already signed
+  const tenantSignatures: Record<string, string> = doc.content?.tenant_signatures ?? {}
+  if (tenantId && tenantSignatures[tenantId]) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F6F4]">
+        <div className="text-center max-w-md p-8">
+          <div className="text-6xl mb-4">✅</div>
+          <h1 className="text-xl font-bold text-slate-800 mb-2">Signature enregistrée</h1>
+          <p className="text-slate-500">Vous avez déjà signé ce document. En attente de la signature des autres parties.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Fetch the specific signing tenant if different from the primary tenant
+  let signingTenant = doc.tenant
+  if (tenantId && tenantId !== doc.tenant_id) {
+    const { data: fetchedTenant } = await serviceClient
+      .from('tenants')
+      .select('id, first_name, last_name, email')
+      .eq('id', tenantId)
+      .single()
+    if (fetchedTenant) signingTenant = fetchedTenant
+  }
+
+  return <SignPage doc={doc} token={params.token} tenantId={tenantId} signingTenant={signingTenant} />
 }

@@ -9,9 +9,11 @@ import { toast } from 'sonner'
 interface Props {
   doc: any
   token: string
+  tenantId: string | null
+  signingTenant: { first_name: string; last_name: string } | null
 }
 
-export default function SignPage({ doc, token }: Props) {
+export default function SignPage({ doc, token, tenantId, signingTenant }: Props) {
   const [signed, setSigned] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -21,7 +23,7 @@ export default function SignPage({ doc, token }: Props) {
       const res = await fetch('/api/documents/tenant-sign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, signature: sigDataUrl }),
+        body: JSON.stringify({ token, signature: sigDataUrl, tenantId }),
       })
       if (res.ok) {
         setSigned(true)
@@ -36,8 +38,8 @@ export default function SignPage({ doc, token }: Props) {
     setLoading(false)
   }
 
-  const tenantName = doc.tenant
-    ? `${doc.tenant.first_name} ${doc.tenant.last_name}`
+  const tenantName = signingTenant
+    ? `${signingTenant.first_name} ${signingTenant.last_name}`
     : 'Locataire'
   const propertyAddress = doc.property
     ? `${doc.property.address}, ${doc.property.city}`
