@@ -12,18 +12,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { LogOut, Settings } from 'lucide-react'
-import { useRouter as useNav } from 'next/navigation'
 import type { Profile } from '@/types/database'
 import NotificationBell from '@/components/dashboard/NotificationBell'
 
 export default function Header({ profile }: { profile: Profile | null }) {
   const router = useRouter()
-  const supabase = createClient()
 
-  const handleLogout = async () => {
+  const handleSignOut = async () => {
+    const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/login')
-    router.refresh()
   }
 
   const initials = profile
@@ -56,7 +54,7 @@ export default function Header({ profile }: { profile: Profile | null }) {
             Paramètres
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleLogout} variant="destructive" className="cursor-pointer">
+          <DropdownMenuItem onClick={handleSignOut} variant="destructive" className="cursor-pointer">
             <LogOut className="h-4 w-4" />
             Déconnexion
           </DropdownMenuItem>
