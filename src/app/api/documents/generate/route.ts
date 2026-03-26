@@ -67,9 +67,16 @@ export async function POST(request: NextRequest) {
 
   if (sendEmail && process.env.RESEND_API_KEY) {
     // Determine all tenant IDs (multi-tenant support)
-    const tenantIds: string[] = Array.isArray(doc.content?.tenant_ids) && doc.content.tenant_ids.length > 0
-      ? doc.content.tenant_ids
-      : (doc.tenant_id ? [doc.tenant_id] : [])
+    let tenantIds: string[] = []
+    const rawTenantIds = doc.content?.tenant_ids
+    if (Array.isArray(rawTenantIds)) {
+      tenantIds = rawTenantIds
+    } else if (typeof rawTenantIds === 'string' && rawTenantIds.length > 0) {
+      tenantIds = rawTenantIds.split(',').map((id: string) => id.trim()).filter(Boolean)
+    }
+    if (tenantIds.length === 0 && doc.tenant_id) {
+      tenantIds = [doc.tenant_id]
+    }
 
     // Fetch all tenants if multi-tenant, otherwise use the already-joined tenant
     let allTenants: { id: string; first_name: string; last_name: string; email: string | null }[] = []

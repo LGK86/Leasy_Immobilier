@@ -37,9 +37,16 @@ export async function POST(req: Request) {
   }
 
   // Determine all tenant IDs
-  const allTenantIds: string[] = Array.isArray(doc.content?.tenant_ids) && doc.content.tenant_ids.length > 0
-    ? doc.content.tenant_ids
-    : (doc.tenant_id ? [doc.tenant_id] : [])
+  let allTenantIds: string[] = []
+  const rawTenantIds = doc.content?.tenant_ids
+  if (Array.isArray(rawTenantIds)) {
+    allTenantIds = rawTenantIds
+  } else if (typeof rawTenantIds === 'string' && rawTenantIds.length > 0) {
+    allTenantIds = rawTenantIds.split(',').map((id: string) => id.trim()).filter(Boolean)
+  }
+  if (allTenantIds.length === 0 && doc.tenant_id) {
+    allTenantIds = [doc.tenant_id]
+  }
 
   // Identify the signing tenant
   const signingTenantId: string = tenantId ?? doc.tenant_id

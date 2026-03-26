@@ -60,6 +60,18 @@ export default async function SignTokenPage({
   // Determine signing tenant ID
   const tenantId = searchParams.tid ?? doc.tenant_id ?? null
 
+  // Resolve all tenant IDs (supports both array and legacy comma-string formats)
+  let allTenantIds: string[] = []
+  const rawTenantIds = doc.content?.tenant_ids
+  if (Array.isArray(rawTenantIds)) {
+    allTenantIds = rawTenantIds
+  } else if (typeof rawTenantIds === 'string' && rawTenantIds.length > 0) {
+    allTenantIds = rawTenantIds.split(',').map((id: string) => id.trim()).filter(Boolean)
+  }
+  if (allTenantIds.length === 0 && doc.tenant_id) {
+    allTenantIds = [doc.tenant_id]
+  }
+
   // Check if this specific tenant has already signed
   const tenantSignatures: Record<string, string> = doc.content?.tenant_signatures ?? {}
   if (tenantId && tenantSignatures[tenantId]) {
