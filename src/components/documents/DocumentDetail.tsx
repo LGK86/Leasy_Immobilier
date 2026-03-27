@@ -130,6 +130,7 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
       }
 
       // Mettre à jour le statut du bien si c'est un bail
+      console.log('property_id:', doc.property_id, 'type:', doc.type, 'entryDate:', doc.content?.["Date d'entrée"])
       if (doc.property_id && doc.type === 'lease') {
         const entryDate = doc.content?.["Date d'entrée"] as string | undefined
         const today = new Date().toISOString().split('T')[0]
