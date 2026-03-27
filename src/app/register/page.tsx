@@ -38,7 +38,7 @@ export default function RegisterPage() {
 
     setLoading(true)
 
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -51,12 +51,14 @@ export default function RegisterPage() {
       toast.error(error.message)
       setLoading(false)
     } else {
-      if (data.user) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
         await supabase.from('profiles').upsert({
-          id: data.user.id,
-          email,
+          id: user.id,
           first_name: firstName,
           last_name: lastName,
+          email,
+          updated_at: new Date().toISOString(),
         })
       }
       setEmailSent(true)
@@ -151,7 +153,7 @@ export default function RegisterPage() {
                   />
                   <p className="text-xs text-leasy-muted">8 caractères min., 1 majuscule, 1 chiffre ou caractère spécial</p>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 mb-4">
                   <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
                   <Input
                     id="confirmPassword"

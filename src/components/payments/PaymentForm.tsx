@@ -96,7 +96,7 @@ export default function PaymentForm({ payment, properties, tenants, userId, onSu
       period_month: parseInt(form.period_month),
       period_year: parseInt(form.period_year),
       status: form.status,
-      payment_date: form.status === 'received' ? form.payment_date : null,
+      payment_date: form.payment_date || null,
       notes: form.notes || null,
       updated_at: new Date().toISOString(),
     }
@@ -244,12 +244,10 @@ export default function PaymentForm({ payment, properties, tenants, userId, onSu
             </SelectContent>
           </Select>
         </div>
-        {form.status === 'received' && (
-          <div className="space-y-2">
-            <Label>Date de paiement</Label>
-            <Input type="date" value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} />
-          </div>
-        )}
+        <div className="space-y-2">
+          <Label>Date du paiement</Label>
+          <Input type="date" value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} />
+        </div>
       </div>
 
       <div className="space-y-2">
