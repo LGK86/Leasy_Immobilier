@@ -137,6 +137,14 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
         }
       }
 
+      // Mettre à jour le statut du bien si c'est un bail
+      if (doc.property_id && doc.type === 'lease') {
+        const entryDate = doc.content?.["Date d'entrée"] as string | undefined
+        const today = new Date().toISOString().split('T')[0]
+        const propertyStatus = entryDate && entryDate <= today ? 'rented' : 'upcoming'
+        await supabase.from('properties').update({ status: propertyStatus }).eq('id', doc.property_id)
+      }
+
       if (doc.tenant_signature) {
         await fetch('/api/documents/generate', {
           method: 'POST',
