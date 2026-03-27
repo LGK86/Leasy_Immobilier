@@ -103,9 +103,9 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
         if (data) {
           setValues(v => ({
             ...v,
-            monthly_rent: String(data.monthly_rent ?? ''),
-            charges: String(data.charges ?? ''),
-            deposit: String(data.deposit ?? ''),
+            'Loyer mensuel (€)': String(data.monthly_rent ?? ''),
+            'Charges (€)': String(data.charges ?? ''),
+            'Dépôt de garantie (€)': String(data.deposit ?? ''),
           }))
         }
       })
@@ -206,7 +206,7 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
     } else {
       // Si bail, mettre à jour le statut du bien selon la date d'entrée
       if (docType === 'lease' && propertyId) {
-        const startDate = values['start_date']
+        const startDate = values["Date d'entrée"]
         const today = new Date().toISOString().split('T')[0]
         if (startDate && startDate <= today) {
           await supabase
