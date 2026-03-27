@@ -250,9 +250,9 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
                 if (data) {
                   setValues(prev => ({
                     ...prev,
-                    'Loyer mensuel (€)': String(data.monthly_rent ?? ''),
-                    'Charges (€)': String(data.charges ?? ''),
-                    'Dépôt de garantie (€)': String(data.deposit ?? ''),
+                    monthly_rent: String(data.monthly_rent ?? ''),
+                    charges: String(data.charges ?? ''),
+                    deposit: String(data.deposit ?? ''),
                   }))
                 }
               })
