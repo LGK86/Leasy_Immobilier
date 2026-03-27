@@ -38,7 +38,7 @@ export default function RegisterPage() {
 
     setLoading(true)
 
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -51,10 +51,9 @@ export default function RegisterPage() {
       toast.error(error.message)
       setLoading(false)
     } else {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
+      if (signUpData.user) {
         await supabase.from('profiles').upsert({
-          id: user.id,
+          id: signUpData.user.id,
           first_name: firstName,
           last_name: lastName,
           email,
