@@ -153,7 +153,7 @@ export default function RegisterPage() {
                   />
                   <p className="text-xs text-leasy-muted">8 caractères min., 1 majuscule, 1 chiffre ou caractère spécial</p>
                 </div>
-                <div className="space-y-2 pb-4">
+                <div className="space-y-2 pb-2">
                   <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
                   <Input
                     id="confirmPassword"
