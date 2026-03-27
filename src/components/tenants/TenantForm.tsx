@@ -91,11 +91,11 @@ export default function TenantForm({ tenant, properties, userId, onSuccess }: Pr
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label>Prénom</Label>
-          <Input placeholder="Jean" value={form.first_name} onChange={set('first_name')} required />
+          <Input placeholder="Jean" value={form.first_name} onChange={set('first_name')} style={{ textTransform: 'capitalize' }} required />
         </div>
         <div className="space-y-2">
           <Label>Nom</Label>
-          <Input placeholder="Dupont" value={form.last_name} onChange={set('last_name')} required />
+          <Input placeholder="Dupont" value={form.last_name} onChange={set('last_name')} style={{ textTransform: 'capitalize' }} required />
         </div>
       </div>
       <div className="space-y-2">

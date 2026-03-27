@@ -82,7 +82,7 @@ export default function LoginPage() {
                   required
                 />
               </div>
-              <div className="flex items-center gap-2 mb-6">
+              <div className="flex items-center gap-2 py-3">
                 <input
                   id="rememberMe"
                   type="checkbox"
@@ -95,7 +95,7 @@ export default function LoginPage() {
                 </Label>
               </div>
             </CardContent>
-            <CardFooter className="flex flex-col gap-4">
+            <CardFooter className="flex flex-col gap-4 mt-2">
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Se connecter

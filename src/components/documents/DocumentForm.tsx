@@ -20,10 +20,10 @@ const docTypes = [
 const defaultFields: Record<string, { key: string; label: string }[]> = {
   lease: [
     { key: 'duration_months', label: 'Durée du bail (mois)' },
+    { key: 'start_date', label: "Date d'entrée" },
     { key: 'monthly_rent', label: 'Loyer mensuel (€)' },
     { key: 'charges', label: 'Charges (€)' },
     { key: 'deposit', label: 'Dépôt de garantie (€)' },
-    { key: 'start_date', label: 'Date de début' },
   ],
   entry_inspection: [
     { key: 'inspection_date', label: "Date de l'état des lieux" },
@@ -338,17 +338,20 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
           <Separator />
           <p className="text-sm font-medium text-slate-600">Informations du document</p>
           <div className="grid grid-cols-2 gap-3">
-            {fields.map((f) => (
-              <div key={f.key} className="space-y-1">
-                <Label className="text-xs">{f.label}</Label>
-                <Input
-                  type={f.key.includes('_date') || f.key === 'start_date' ? 'date' : 'text'}
-                  placeholder={f.label}
-                  value={values[f.key] ?? ''}
-                  onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
-                />
-              </div>
-            ))}
+            {fields.map((f, i) => {
+              const isLastOdd = fields.length % 2 !== 0 && i === fields.length - 1
+              return (
+                <div key={f.key} className={`space-y-1${isLastOdd ? ' col-span-2' : ''}`}>
+                  <Label className="text-xs">{f.label}</Label>
+                  <Input
+                    type={f.key.includes('_date') || f.key === 'start_date' ? 'date' : 'text'}
+                    placeholder={f.label}
+                    value={values[f.key] ?? ''}
+                    onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
+                  />
+                </div>
+              )
+            })}
             {customFields.map((f, i) => (
               <div key={f.key} className="space-y-1">
                 <div className="flex items-center gap-1">

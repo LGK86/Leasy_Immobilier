@@ -99,7 +99,7 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
         </div>
         <div className="space-y-2">
           <Label>Ville</Label>
-          <Input placeholder="Paris" value={form.city} onChange={set('city')} required />
+          <Input placeholder="Paris" value={form.city} onChange={set('city')} style={{ textTransform: 'capitalize' }} required />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">

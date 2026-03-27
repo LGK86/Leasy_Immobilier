@@ -72,11 +72,11 @@ export default function SettingsForm({ profile, userId }: Props) {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Prénom</Label>
-                <Input placeholder="Jean" value={form.first_name} onChange={set('first_name')} />
+                <Input placeholder="Jean" value={form.first_name} onChange={set('first_name')} style={{ textTransform: 'capitalize' }} />
               </div>
               <div className="space-y-2">
                 <Label>Nom</Label>
-                <Input placeholder="Dupont" value={form.last_name} onChange={set('last_name')} />
+                <Input placeholder="Dupont" value={form.last_name} onChange={set('last_name')} style={{ textTransform: 'capitalize' }} />
               </div>
             </div>
             <div className="space-y-2">
@@ -95,7 +95,7 @@ export default function SettingsForm({ profile, userId }: Props) {
             </div>
             <div className="space-y-2">
               <Label>Rue</Label>
-              <Input placeholder="12 rue de la Paix" value={form.address} onChange={set('address')} />
+              <Input placeholder="12 rue de la Paix" value={form.address} onChange={set('address')} style={{ textTransform: 'capitalize' }} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -104,7 +104,7 @@ export default function SettingsForm({ profile, userId }: Props) {
               </div>
               <div className="space-y-2">
                 <Label>Ville</Label>
-                <Input placeholder="Paris" value={form.city} onChange={set('city')} />
+                <Input placeholder="Paris" value={form.city} onChange={set('city')} style={{ textTransform: 'capitalize' }} />
               </div>
             </div>
 

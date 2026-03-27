@@ -28,9 +28,11 @@ export default function Header({ profile }: { profile: Profile | null }) {
     router.push('/login')
   }
 
-  const initials = profile
-    ? `${profile.first_name?.[0] ?? ''}${profile.last_name?.[0] ?? ''}`.toUpperCase() || 'U'
-    : 'U'
+  const initials = profile?.first_name && profile?.last_name
+    ? `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase()
+    : profile?.email
+      ? profile.email[0].toUpperCase()
+      : 'U'
 
   const displayName = profile
     ? `${profile.first_name ?? ''} ${(profile.last_name ?? '').toUpperCase()}`.trim() || profile.email

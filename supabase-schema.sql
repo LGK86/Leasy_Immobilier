@@ -198,3 +198,7 @@ create table if not exists public.admin_users (
 );
 
 -- Pas de RLS sur admin_users — accès via service role uniquement
+
+-- NOTE : Le template email de confirmation doit être configuré manuellement dans
+-- Supabase Dashboard → Authentication → Email Templates
+-- Voir supabase-email-templates.md pour le contenu HTML à utiliser.
