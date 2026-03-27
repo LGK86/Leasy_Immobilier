@@ -105,7 +105,7 @@ export default function RegisterPage() {
               <CardDescription>Gérez vos biens locatifs en toute simplicité</CardDescription>
             </CardHeader>
             <form onSubmit={handleRegister}>
-              <CardContent className="space-y-4 pb-6">
+              <CardContent className="space-y-4 pb-2">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">Prénom</Label>
