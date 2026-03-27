@@ -120,6 +120,23 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
       setOwnerSig(sigDataUrl)
       setShowCanvas(false)
       toast.success('Signature enregistrée')
+
+      // Mettre à jour le statut des locataires associés
+      const tenantIds: string[] = Array.isArray(doc.content?.tenant_ids) ? doc.content.tenant_ids : []
+      if (tenantIds.length > 0) {
+        const today = new Date().toISOString().split('T')[0]
+        const { data: tenantRows } = await supabase
+          .from('tenants')
+          .select('id, entry_date')
+          .in('id', tenantIds)
+        if (tenantRows) {
+          await Promise.all(tenantRows.map(t => {
+            const status = t.entry_date && t.entry_date <= today ? 'active' : 'upcoming'
+            return supabase.from('tenants').update({ status }).eq('id', t.id)
+          }))
+        }
+      }
+
       if (doc.tenant_signature) {
         await fetch('/api/documents/generate', {
           method: 'POST',
