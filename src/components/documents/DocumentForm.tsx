@@ -99,7 +99,8 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
       .select('monthly_rent, charges, deposit')
       .eq('id', propertyId)
       .single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        console.log('Property data:', data, 'Error:', error)
         if (data) {
           setValues(v => ({
             ...v,
