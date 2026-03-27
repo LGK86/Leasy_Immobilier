@@ -131,7 +131,8 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
           .in('id', tenantIds)
         if (tenantRows) {
           await Promise.all(tenantRows.map(t => {
-            const status = t.entry_date && t.entry_date <= today ? 'active' : 'upcoming'
+            const entryDateTenant = doc.content?.["Date d'entrée"] as string | undefined
+            const status = entryDateTenant && entryDateTenant <= today ? 'active' : 'upcoming'
             return supabase.from('tenants').update({ status }).eq('id', t.id)
           }))
         }
