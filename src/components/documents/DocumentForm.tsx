@@ -380,7 +380,10 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
         </>
       )}
 
-      <Button type="submit" className="w-full" disabled={loading || !propertyId}>
+      {docType === 'lease' && tenantIds.length === 0 && (
+        <p className="text-sm text-red-500">Un bail doit avoir au moins un locataire</p>
+      )}
+      <Button type="submit" className="w-full" disabled={loading || !propertyId || (docType === 'lease' && tenantIds.length === 0)}>
         {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
         Créer le document
       </Button>
