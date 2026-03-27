@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import AddressAutocomplete from '@/components/ui/address-autocomplete'
 import { createClient } from '@/lib/supabase/client'
@@ -107,7 +107,9 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
           <Label>Type de bien</Label>
           <Select value={form.type} onValueChange={setSelect('type')}>
             <SelectTrigger className="w-full">
-              <SelectValue />
+              <span className="flex-1 text-left truncate text-sm">
+                {({'apartment':'Appartement','house':'Maison','studio':'Studio','room':'Chambre','other':'Autre'} as Record<string,string>)[form.type]}
+              </span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="apartment">Appartement</SelectItem>
@@ -122,7 +124,9 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
           <Label>Statut</Label>
           <Select value={form.status} onValueChange={setSelect('status')}>
             <SelectTrigger className="w-full">
-              <SelectValue />
+              <span className="flex-1 text-left truncate text-sm">
+                {({'rented':'Loué','vacant':'Vacant'} as Record<string,string>)[form.status]}
+              </span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="rented">Loué</SelectItem>

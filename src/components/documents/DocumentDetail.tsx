@@ -172,7 +172,7 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
             <p className="text-sm text-slate-400 py-4 text-center">Aucun champ à afficher.</p>
           ) : (
             <div className="grid grid-cols-1 gap-3">
-              {Object.entries(content).map(([key, value]) => (
+              {Object.entries(content).filter(([key]) => key !== 'tenant_ids').map(([key, value]) => (
                 <div key={key} className="space-y-1">
                   <label className="text-xs font-medium text-slate-500">{key}</label>
                   <Input
