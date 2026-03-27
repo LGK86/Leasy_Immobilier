@@ -7,6 +7,10 @@
     {
       "path": "/api/receipts/generate-monthly",
       "schedule": "0 6 1 * *"
+    },
+    {
+      "path": "/api/tenants/update-status",
+      "schedule": "0 1 * * *"
     }
   ]
 }
