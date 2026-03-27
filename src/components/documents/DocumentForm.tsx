@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -90,28 +90,6 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
   const [fields, setFields] = useState(defaultFields['lease'])
   const [values, setValues] = useState<Record<string, string>>({})
   const [customFields, setCustomFields] = useState<{ key: string; label: string }[]>([])
-
-  // Pre-fill lease fields from property data
-  useEffect(() => {
-    if (!propertyId || docType !== 'lease') return
-    supabase
-      .from('properties')
-      .select('monthly_rent, charges, deposit')
-      .eq('id', propertyId)
-      .single()
-      .then(({ data, error }) => {
-        console.log('Property data:', data, 'Error:', error)
-        if (data) {
-          setValues(v => ({
-            ...v,
-            'Loyer mensuel (€)': String(data.monthly_rent ?? ''),
-            'Charges (€)': String(data.charges ?? ''),
-            'Dépôt de garantie (€)': String(data.deposit ?? ''),
-          }))
-        }
-      })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [propertyId, docType])
 
   // Inline tenant creation
   const [showNewTenantForm, setShowNewTenantForm] = useState(false)
@@ -258,7 +236,28 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
 
       <div className="space-y-2">
         <Label>Bien</Label>
-        <Select value={propertyId || undefined} onValueChange={(v) => { setPropertyId(v ?? ''); setTenantIds([]) }}>
+        <Select value={propertyId || undefined} onValueChange={(v) => {
+          setPropertyId(v ?? '')
+          setTenantIds([])
+          if (v && docType === 'lease') {
+            supabase
+              .from('properties')
+              .select('monthly_rent, charges, deposit')
+              .eq('id', v)
+              .single()
+              .then(({ data, error }) => {
+                console.log('Property data:', data, 'Error:', error)
+                if (data) {
+                  setValues(prev => ({
+                    ...prev,
+                    'Loyer mensuel (€)': String(data.monthly_rent ?? ''),
+                    'Charges (€)': String(data.charges ?? ''),
+                    'Dépôt de garantie (€)': String(data.deposit ?? ''),
+                  }))
+                }
+              })
+          }
+        }}>
           <SelectTrigger className="w-full">
             <TriggerLabel
               value={properties.find(p => p.id === propertyId) ? `${properties.find(p => p.id === propertyId)!.address}, ${properties.find(p => p.id === propertyId)!.city}` : undefined}
