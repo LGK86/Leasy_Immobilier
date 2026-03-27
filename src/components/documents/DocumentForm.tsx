@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -91,6 +91,27 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
   const [values, setValues] = useState<Record<string, string>>({})
   const [customFields, setCustomFields] = useState<{ key: string; label: string }[]>([])
 
+  // Pre-fill lease fields from property data
+  useEffect(() => {
+    if (!propertyId || docType !== 'lease') return
+    supabase
+      .from('properties')
+      .select('monthly_rent, charges, deposit')
+      .eq('id', propertyId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setValues(v => ({
+            ...v,
+            monthly_rent: String(data.monthly_rent ?? ''),
+            charges: String(data.charges ?? ''),
+            deposit: String(data.deposit ?? ''),
+          }))
+        }
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propertyId, docType])
+
   // Inline tenant creation
   const [showNewTenantForm, setShowNewTenantForm] = useState(false)
   const [newTenant, setNewTenant] = useState<NewTenantForm>({ first_name: '', last_name: '', email: '', phone: '' })
@@ -155,8 +176,7 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
     setCreatingTenant(false)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const createDocument = async () => {
     setLoading(true)
 
     const content: Record<string, string | string[]> = {}
@@ -181,9 +201,34 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
       .select('*, property:properties(*), tenant:tenants(*)')
       .single()
 
-    if (error) toast.error('Erreur : ' + error.message)
-    else { toast.success('Document créé'); onSuccess(inserted) }
+    if (error) {
+      toast.error('Erreur : ' + error.message)
+    } else {
+      // Si bail, mettre à jour le statut du bien selon la date d'entrée
+      if (docType === 'lease' && propertyId) {
+        const startDate = values['start_date']
+        const today = new Date().toISOString().split('T')[0]
+        if (startDate && startDate <= today) {
+          await supabase
+            .from('properties')
+            .update({ status: 'rented' })
+            .eq('id', propertyId)
+        }
+      }
+      toast.success('Document créé')
+      onSuccess(inserted)
+    }
     setLoading(false)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await createDocument()
+  }
+
+  const handleSaveDraft = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    await createDocument()
   }
 
   return (
@@ -381,7 +426,19 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
       )}
 
       {docType === 'lease' && tenantIds.length === 0 && (
-        <p className="text-sm text-red-500">Un bail doit avoir au moins un locataire</p>
+        <>
+          <p className="text-sm text-red-500">Un bail doit avoir au moins un locataire</p>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={loading || !propertyId}
+            onClick={handleSaveDraft}
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Sauvegarder en brouillon
+          </Button>
+        </>
       )}
       <Button type="submit" className="w-full" disabled={loading || !propertyId || (docType === 'lease' && tenantIds.length === 0)}>
         {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
