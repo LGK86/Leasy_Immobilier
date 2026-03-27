@@ -135,7 +135,8 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
         const entryDate = doc.content?.["Date d'entrée"] as string | undefined
         const today = new Date().toISOString().split('T')[0]
         const propertyStatus = entryDate && entryDate <= today ? 'rented' : 'upcoming'
-        await supabase.from('properties').update({ status: propertyStatus }).eq('id', doc.property_id)
+        const { error: propError } = await supabase.from('properties').update({ status: propertyStatus }).eq('id', doc.property_id)
+        console.log('Property update error:', propError)
       }
 
       if (doc.tenant_signature) {
