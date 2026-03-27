@@ -138,15 +138,15 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-2">
           <Label>Loyer (€)</Label>
-          <Input type="number" placeholder="800" value={form.monthly_rent} onChange={set('monthly_rent')} required min="0" step="10" />
+          <Input type="number" placeholder="800" value={form.monthly_rent} onChange={set('monthly_rent')} required min="0" step="any" />
         </div>
         <div className="space-y-2">
           <Label>Charges (€)</Label>
-          <Input type="number" placeholder="50" value={form.charges} onChange={set('charges')} min="0" step="10" />
+          <Input type="number" placeholder="50" value={form.charges} onChange={set('charges')} min="0" step="any" />
         </div>
         <div className="space-y-2">
           <Label>Dépôt (€)</Label>
-          <Input type="number" placeholder="1600" value={form.deposit} onChange={set('deposit')} min="0" step="10" />
+          <Input type="number" placeholder="1600" value={form.deposit} onChange={set('deposit')} min="0" step="any" />
         </div>
       </div>
       <div className="space-y-2">

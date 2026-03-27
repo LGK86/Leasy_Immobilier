@@ -124,18 +124,9 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
       // Mettre à jour le statut des locataires associés
       const tenantIds: string[] = Array.isArray(doc.content?.tenant_ids) ? doc.content.tenant_ids : []
       if (tenantIds.length > 0) {
-        const today = new Date().toISOString().split('T')[0]
-        const { data: tenantRows } = await supabase
-          .from('tenants')
-          .select('id, entry_date')
-          .in('id', tenantIds)
-        if (tenantRows) {
-          await Promise.all(tenantRows.map(t => {
-            const entryDateTenant = doc.content?.["Date d'entrée"] as string | undefined
-            const status = entryDateTenant && entryDateTenant <= today ? 'active' : 'upcoming'
-            return supabase.from('tenants').update({ status }).eq('id', t.id)
-          }))
-        }
+        const docStatus = doc.tenant_signature ? 'finalized' : 'signed'
+        const tenantStatus = docStatus === 'finalized' ? 'lease_signed' : 'pending_signature'
+        await supabase.from('tenants').update({ status: tenantStatus }).in('id', tenantIds)
       }
 
       // Mettre à jour le statut du bien si c'est un bail
