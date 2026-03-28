@@ -77,12 +77,12 @@ export default function TenantList({ tenants, properties, userId }: Props) {
                   <div>
                     <h3 className="font-semibold text-slate-800">{tenant.first_name} {tenant.last_name}</h3>
                     {tenant.status && statusConfig[tenant.status] && (
-                      <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-1 ${statusConfig[tenant.status].className}`}>
+                      <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-2 ${statusConfig[tenant.status].className}`}>
                         {statusConfig[tenant.status].label}
                       </span>
                     )}
                     {tenant.property && (
-                      <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
+                      <div className="flex items-center gap-1 text-xs text-slate-400 mt-2">
                         <MapPin className="h-3 w-3" />
                         {tenant.property.address}, {tenant.property.city}
                       </div>
