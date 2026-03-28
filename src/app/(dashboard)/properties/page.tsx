@@ -9,7 +9,7 @@ export default async function PropertiesPage() {
 
   const { data: properties } = await supabase
     .from('properties')
-    .select('*')
+    .select('*, documents(id, type, status)')
     .eq('owner_id', user.id)
     .order('created_at', { ascending: false })
 

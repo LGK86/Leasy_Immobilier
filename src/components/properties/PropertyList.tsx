@@ -11,6 +11,19 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import type { Property } from '@/types/database'
+
+type PropertyWithDocs = Property & {
+  documents?: { id: string; type: string; status: string }[]
+}
+
+function getLeaseBadge(documents?: { id: string; type: string; status: string }[]) {
+  const leases = (documents ?? []).filter(d => d.type === 'lease')
+  if (leases.length === 0) return { label: 'Aucun bail', className: 'bg-slate-100 text-slate-500 whitespace-nowrap' }
+  const latest = leases[leases.length - 1]
+  if (latest.status === 'finalized') return { label: 'Bail signé', className: 'bg-emerald-100 text-emerald-700 whitespace-nowrap' }
+  if (latest.status === 'signed' || latest.status === 'pending_tenant_signature') return { label: 'Bail en attente', className: 'bg-orange-100 text-orange-700 whitespace-nowrap' }
+  return { label: 'Aucun bail', className: 'bg-slate-100 text-slate-500 whitespace-nowrap' }
+}
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +43,7 @@ const typeLabels: Record<string, string> = {
   other: 'Autre',
 }
 
-export default function PropertyList({ properties, userId }: { properties: Property[]; userId: string }) {
+export default function PropertyList({ properties, userId }: { properties: PropertyWithDocs[]; userId: string }) {
   const [open, setOpen] = useState(false)
   const [editProperty, setEditProperty] = useState<Property | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -81,9 +94,15 @@ export default function PropertyList({ properties, userId }: { properties: Prope
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <Badge variant={property.status === 'rented' ? 'default' : 'secondary'} className="mb-2">
-                      {property.status === 'rented' ? 'Loué' : 'Vacant'}
-                    </Badge>
+                    <div className="flex gap-1.5 flex-wrap mb-2">
+                      <Badge variant={property.status === 'rented' ? 'default' : 'secondary'}>
+                        {property.status === 'rented' ? 'Loué' : 'Vacant'}
+                      </Badge>
+                      {(() => {
+                        const lb = getLeaseBadge(property.documents)
+                        return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${lb.className}`}>{lb.label}</span>
+                      })()}
+                    </div>
                     <CardTitle className="text-base">{typeLabels[property.type] ?? property.type}</CardTitle>
                   </div>
                   <div className="flex gap-1">
