@@ -76,6 +76,11 @@ export default function TenantList({ tenants, properties, userId }: Props) {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-slate-800">{tenant.first_name} {tenant.last_name}</h3>
+                    {tenant.status && statusConfig[tenant.status] && (
+                      <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-1 ${statusConfig[tenant.status].className}`}>
+                        {statusConfig[tenant.status].label}
+                      </span>
+                    )}
                     {tenant.property && (
                       <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
                         <MapPin className="h-3 w-3" />
@@ -84,11 +89,6 @@ export default function TenantList({ tenants, properties, userId }: Props) {
                     )}
                   </div>
                   <div className="flex items-center gap-1">
-                    {tenant.status && statusConfig[tenant.status] && (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusConfig[tenant.status].className}`}>
-                        {statusConfig[tenant.status].label}
-                      </span>
-                    )}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditTenant(tenant); setOpen(true) }}>
                       <Pencil className="h-4 w-4" />
                     </Button>
