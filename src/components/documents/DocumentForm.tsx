@@ -19,11 +19,24 @@ const docTypes = [
 
 const defaultFields: Record<string, { key: string; label: string }[]> = {
   lease: [
-    { key: 'duration_months', label: 'Durée du bail (mois)' },
-    { key: 'start_date', label: "Date d'entrée" },
-    { key: 'monthly_rent', label: 'Loyer mensuel (€)' },
-    { key: 'charges', label: 'Charges (€)' },
-    { key: 'deposit', label: 'Dépôt de garantie (€)' },
+    { key: 'start_date',           label: "Date d'entree" },
+    { key: 'duration_months',      label: 'Duree du bail (mois)' },
+    { key: 'monthly_rent',         label: 'Loyer mensuel (€)' },
+    { key: 'charges',              label: 'Charges (€)' },
+    { key: 'deposit',              label: 'Depot de garantie (€)' },
+    { key: 'surface',              label: 'Surface habitable' },
+    { key: 'rooms',                label: 'Nombre de pieces' },
+    { key: 'construction_period',  label: 'Periode de construction' },
+    { key: 'habitat_type',         label: 'Type d habitat' },
+    { key: 'regime',               label: 'Regime' },
+    { key: 'other_parts',          label: 'Autres parties' },
+    { key: 'equipment',            label: 'Equipements' },
+    { key: 'heating',              label: 'Chauffage' },
+    { key: 'hot_water',            label: 'Eau chaude' },
+    { key: 'private_locals',       label: 'Locaux privatifs' },
+    { key: 'common_parts',         label: 'Parties communes' },
+    { key: 'internet',             label: 'Internet' },
+    { key: 'special_conditions',   label: 'Conditions particulieres' },
   ],
   entry_inspection: [
     { key: 'inspection_date', label: "Date de l'état des lieux" },
@@ -208,7 +221,7 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
     } else {
       // Si bail, mettre à jour le statut du bien selon la date d'entrée
       if (docType === 'lease' && propertyId) {
-        const startDate = values["Date d'entrée"]
+        const startDate = values["Date d'entree"]
         const today = new Date().toISOString().split('T')[0]
         if (startDate && startDate <= today) {
           await supabase
@@ -273,9 +286,9 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
                 if (data) {
                   setValues(prev => ({
                     ...prev,
-                    monthly_rent: String(data.monthly_rent ?? ''),
-                    charges: String(data.charges ?? ''),
-                    deposit: String(data.deposit ?? ''),
+                    'Loyer mensuel (€)': String(data.monthly_rent ?? ''),
+                    'Charges (€)': String(data.charges ?? ''),
+                    'Depot de garantie (€)': String(data.deposit ?? ''),
                   }))
                 }
               })

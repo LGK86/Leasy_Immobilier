@@ -39,12 +39,14 @@ export async function POST(request: NextRequest) {
   }
 
   const { data: pdfTenants } = tenantIds.length > 0
-    ? await supabase.from('tenants').select('id, first_name, last_name').in('id', tenantIds)
+    ? await supabase.from('tenants').select('id, first_name, last_name, email, phone').in('id', tenantIds)
     : { data: [] }
 
   const tenantSignatures: Record<string, string> = doc.content?.tenant_signatures ?? {}
   const tenants = (pdfTenants ?? []).map(t => ({
     name: `${t.first_name} ${t.last_name}`,
+    email: t.email ?? undefined,
+    phone: t.phone ?? undefined,
     signature: tenantSignatures[t.id] ?? doc.tenant_signature ?? null,
   }))
 
@@ -53,6 +55,8 @@ export async function POST(request: NextRequest) {
     title: doc.title,
     ownerName: `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim(),
     ownerAddress: `${profile?.address ?? ''}, ${profile?.postal_code ?? ''} ${profile?.city ?? ''}`,
+    ownerEmail: profile?.email ?? undefined,
+    ownerPhone: profile?.phone ?? undefined,
     tenants,
     propertyAddress: doc.property?.address ?? '',
     propertyCity: doc.property?.city ?? '',
