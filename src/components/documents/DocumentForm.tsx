@@ -90,16 +90,17 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
   const [fields, setFields] = useState(defaultFields['lease'])
   const [values, setValues] = useState<Record<string, string>>({})
   const [customFields, setCustomFields] = useState<{ key: string; label: string }[]>([])
-  const [splitRent, setSplitRent] = useState(false)
+  const [splitRent, setSplitRent] = useState(true)
   const [rentSplit, setRentSplit] = useState<Record<string, number>>({})
 
   const updateRentSplit = (ids?: string[], rent?: string) => {
     const currentIds = ids ?? tenantIds
-    const currentRent = parseFloat(rent ?? values['monthly_rent'] ?? '0')
+    const currentRent = Math.round(parseFloat(rent ?? values['monthly_rent'] ?? '0'))
     if (currentIds.length === 0) return
-    const share = Math.round((currentRent / currentIds.length) * 100) / 100
+    const base = Math.floor(currentRent / currentIds.length)
+    const remainder = currentRent - base * currentIds.length
     const split: Record<string, number> = {}
-    currentIds.forEach(id => { split[id] = share })
+    currentIds.forEach((id, i) => { split[id] = i === 0 ? base + remainder : base })
     setRentSplit(split)
   }
 
@@ -125,13 +126,15 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
     if (!id || tenantIds.includes(id)) return
     const newIds = [...tenantIds, id]
     setTenantIds(newIds)
-    if (splitRent) updateRentSplit(newIds)
+    setSplitRent(true)
+    updateRentSplit(newIds)
   }
 
   const removeTenant = (id: string) => {
     const newIds = tenantIds.filter(t => t !== id)
     setTenantIds(newIds)
-    if (splitRent) updateRentSplit(newIds)
+    setSplitRent(true)
+    updateRentSplit(newIds)
   }
 
   const addCustomField = () => {
@@ -439,9 +442,6 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
               </div>
             ))}
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={addCustomField}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un champ
-          </Button>
         </>
       )}
 
@@ -493,6 +493,10 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
           </div>
         </>
       )}
+
+      <Button type="button" variant="outline" size="sm" onClick={addCustomField}>
+        <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un champ
+      </Button>
 
       {docType === 'lease' && tenantIds.length === 0 && (
         <>
