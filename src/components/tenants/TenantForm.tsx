@@ -55,7 +55,7 @@ export default function TenantForm({ tenant, properties, userId, onSuccess }: Pr
       entry_date: form.entry_date || null,
       lease_end_date: form.lease_end_date || null,
       tacite_reconduction: form.tacite_reconduction,
-      status,
+      status: status === 'active' && !form.entry_date ? 'draft' : status,
       updated_at: new Date().toISOString(),
     }
 
