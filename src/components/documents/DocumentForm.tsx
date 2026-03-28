@@ -90,6 +90,18 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
   const [fields, setFields] = useState(defaultFields['lease'])
   const [values, setValues] = useState<Record<string, string>>({})
   const [customFields, setCustomFields] = useState<{ key: string; label: string }[]>([])
+  const [splitRent, setSplitRent] = useState(false)
+  const [rentSplit, setRentSplit] = useState<Record<string, number>>({})
+
+  const updateRentSplit = (ids?: string[], rent?: string) => {
+    const currentIds = ids ?? tenantIds
+    const currentRent = parseFloat(rent ?? values['monthly_rent'] ?? '0')
+    if (currentIds.length === 0) return
+    const share = Math.round((currentRent / currentIds.length) * 100) / 100
+    const split: Record<string, number> = {}
+    currentIds.forEach(id => { split[id] = share })
+    setRentSplit(split)
+  }
 
   // Inline tenant creation
   const [showNewTenantForm, setShowNewTenantForm] = useState(false)
@@ -111,11 +123,15 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
 
   const addTenant = (id: string) => {
     if (!id || tenantIds.includes(id)) return
-    setTenantIds(prev => [...prev, id])
+    const newIds = [...tenantIds, id]
+    setTenantIds(newIds)
+    if (splitRent) updateRentSplit(newIds)
   }
 
   const removeTenant = (id: string) => {
-    setTenantIds(prev => prev.filter(t => t !== id))
+    const newIds = tenantIds.filter(t => t !== id)
+    setTenantIds(newIds)
+    if (splitRent) updateRentSplit(newIds)
   }
 
   const addCustomField = () => {
@@ -161,6 +177,10 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
     const content: Record<string, string | string[]> = {}
     for (const f of [...fields, ...customFields]) {
       if (values[f.key]) content[f.label] = values[f.key]
+    }
+
+    if (splitRent && Object.keys(rentSplit).length > 0) {
+      content['rent_split'] = JSON.stringify(rentSplit)
     }
 
     // Always store tenant_ids as a proper array in content
@@ -422,6 +442,55 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
           <Button type="button" variant="outline" size="sm" onClick={addCustomField}>
             <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un champ
           </Button>
+        </>
+      )}
+
+      {docType === 'lease' && tenantIds.length > 1 && (
+        <>
+          <Separator />
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-600">Répartition du loyer</p>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-slate-500">Diviser entre les locataires</Label>
+                <input
+                  type="checkbox"
+                  checked={splitRent}
+                  onChange={e => { setSplitRent(e.target.checked); if (e.target.checked) updateRentSplit() }}
+                  className="h-4 w-4 accent-leasy-dark"
+                />
+              </div>
+            </div>
+            {splitRent && (
+              <div className="space-y-2">
+                {tenantIds.map(id => {
+                  const t = localTenants.find(t => t.id === id)
+                  if (!t) return null
+                  return (
+                    <div key={id} className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-slate-600">{t.first_name} {t.last_name}</span>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          className="w-24 text-sm"
+                          value={rentSplit[id] ?? 0}
+                          onChange={e => setRentSplit(prev => ({ ...prev, [id]: parseFloat(e.target.value) || 0 }))}
+                        />
+                        <span className="text-xs text-slate-400">€</span>
+                      </div>
+                    </div>
+                  )
+                })}
+                <div className="flex justify-between text-xs text-slate-400 pt-1 border-t">
+                  <span>Total</span>
+                  <span className={Object.values(rentSplit).reduce((a, b) => a + b, 0) !== parseFloat(values['monthly_rent'] ?? '0') ? 'text-red-500' : 'text-emerald-600'}>
+                    {Object.values(rentSplit).reduce((a, b) => a + b, 0)} € / {values['monthly_rent'] ?? 0} €
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
         </>
       )}
 
