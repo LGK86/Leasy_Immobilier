@@ -190,7 +190,7 @@ export default function DocumentList({ documents, properties, tenants, userId }:
 
       {openDetail && (
         <Dialog open={!!openDetail} onOpenChange={() => setOpenDetail(null)}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{openDetail.title}</DialogTitle>
             </DialogHeader>
