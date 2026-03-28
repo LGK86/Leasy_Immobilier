@@ -95,12 +95,12 @@ export default function PropertyList({ properties, userId }: { properties: Prope
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex gap-1.5 flex-wrap mb-2">
-                      <Badge variant={property.status === 'rented' ? 'default' : 'secondary'}>
+                      <Badge variant={property.status === 'rented' ? 'default' : 'secondary'} className="rounded-md">
                         {property.status === 'rented' ? 'Loué' : 'Vacant'}
                       </Badge>
                       {(() => {
                         const lb = getLeaseBadge(property.documents)
-                        return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${lb.className}`}>{lb.label}</span>
+                        return <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${lb.className}`}>{lb.label}</span>
                       })()}
                     </div>
                     <CardTitle className="text-base">{typeLabels[property.type] ?? property.type}</CardTitle>
