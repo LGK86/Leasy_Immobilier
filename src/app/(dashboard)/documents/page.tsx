@@ -14,7 +14,7 @@ export default async function DocumentsPage() {
       .eq('owner_id', user.id)
       .order('created_at', { ascending: false }),
     supabase.from('properties').select('id, address, city').eq('owner_id', user.id),
-    supabase.from('tenants').select('id, first_name, last_name, property_id').eq('owner_id', user.id),
+    supabase.from('tenants').select('id, first_name, last_name, property_id, email, phone').eq('owner_id', user.id),
   ])
 
   return (

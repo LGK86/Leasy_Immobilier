@@ -34,7 +34,7 @@ const statusConfig = {
 interface Props {
   documents: any[]
   properties: { id: string; address: string; city: string }[]
-  tenants: { id: string; first_name: string; last_name: string; property_id: string | null }[]
+  tenants: { id: string; first_name: string; last_name: string; property_id: string | null; email?: string | null; phone?: string | null }[]
   userId: string
 }
 
@@ -197,6 +197,9 @@ export default function DocumentList({ documents, properties, tenants, userId }:
             <DocumentDetail
               document={openDetail}
               onSigned={() => { setOpenDetail(null); router.refresh() }}
+              properties={properties}
+              tenants={tenants}
+              userId={userId}
             />
           </DialogContent>
         </Dialog>

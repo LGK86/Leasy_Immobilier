@@ -27,6 +27,9 @@ const statusConfig = {
 interface Props {
   document: any
   onSigned: () => void
+  properties?: { id: string; address: string; city: string }[]
+  tenants?: { id: string; first_name: string; last_name: string; property_id: string | null; email?: string | null; phone?: string | null }[]
+  userId?: string
 }
 
 function initialStep(doc: any): 1 | 2 | 3 {
@@ -72,17 +75,18 @@ function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
 }
 
 /* ─── Main component ─────────────────────────────────────────── */
-export default function DocumentDetail({ document: doc, onSigned }: Props) {
-  const supabase   = createClient()
-  const [step, setStep]       = useState<1 | 2 | 3>(initialStep(doc))
-  const [ownerSig, setOwnerSig]     = useState<string | null>(doc.owner_signature)
+export default function DocumentDetail({ document: doc, onSigned, properties, tenants, userId }: Props) {
+  const supabase = createClient()
+  const [step, setStep]           = useState<1 | 2 | 3>(initialStep(doc))
+  const [docState, setDocState]   = useState<any>(doc)
+  const [ownerSig, setOwnerSig]   = useState<string | null>(doc.owner_signature)
   const [showCanvas, setShowCanvas] = useState(!doc.owner_signature)
-  const [loading, setLoading]       = useState(false)
-  const [sending, setSending]       = useState(false)
+  const [loading, setLoading]     = useState(false)
+  const [sending, setSending]     = useState(false)
 
-  const sc = statusConfig[doc.status as keyof typeof statusConfig]
+  const sc = statusConfig[docState.status as keyof typeof statusConfig]
 
-  /* ── Step 1 : save content ───────────────────────────────── */
+  /* ── Step 1 : wizard complete ────────────────────────────── */
   const handleSaveContent = async (newContent: Record<string, string>) => {
     setLoading(true)
     const { error } = await supabase
@@ -92,10 +96,20 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
 
     if (error) {
       toast.error('Erreur lors de la sauvegarde')
-    } else {
-      toast.success('Informations mises à jour')
-      setStep(2)
+      setLoading(false)
+      return
     }
+
+    // Refresh local doc state to pick up property_id / tenant_ids saved by wizard auto-save
+    const { data: freshDoc } = await supabase
+      .from('documents')
+      .select('*, property:properties(*), tenant:tenants(*)')
+      .eq('id', doc.id)
+      .single()
+    if (freshDoc) setDocState(freshDoc)
+
+    toast.success('Informations mises à jour')
+    setStep(2)
     setLoading(false)
   }
 
@@ -106,7 +120,7 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
       .from('documents')
       .update({
         owner_signature: sigDataUrl,
-        status: doc.tenant_signature ? 'finalized' : 'signed',
+        status: docState.tenant_signature ? 'finalized' : 'signed',
         updated_at: new Date().toISOString(),
       })
       .eq('id', doc.id)
@@ -119,24 +133,29 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
       toast.success('Signature enregistrée')
 
       // Mettre à jour le statut des locataires associés
-      const tenantIds: string[] = Array.isArray(doc.content?.tenant_ids) ? doc.content.tenant_ids : []
+      const rawIds = docState.content?.tenant_ids
+      const tenantIds: string[] = Array.isArray(rawIds)
+        ? rawIds
+        : typeof rawIds === 'string' && rawIds
+          ? rawIds.split(',').map((s: string) => s.trim()).filter(Boolean)
+          : []
+
       if (tenantIds.length > 0) {
-        const docStatus = doc.tenant_signature ? 'finalized' : 'signed'
+        const docStatus = docState.tenant_signature ? 'finalized' : 'signed'
         const tenantStatus = docStatus === 'finalized' ? 'lease_signed' : 'pending_signature'
         await supabase.from('tenants').update({ status: tenantStatus }).in('id', tenantIds)
       }
 
       // Mettre à jour le statut du bien si c'est un bail
-      console.log('property_id:', doc.property_id, 'type:', doc.type, 'entryDate:', doc.content?.["Date d'entrée"])
-      if (doc.property_id && doc.type === 'lease') {
-        const entryDate = doc.content?.["Date d'entrée"] as string | undefined
+      const currentPropertyId = docState.property_id ?? doc.property_id
+      if (currentPropertyId && docState.type === 'lease') {
+        const entryDate = (docState.content?.["Date d'entree"] || docState.content?.["Date d'entrée"]) as string | undefined
         const today = new Date().toISOString().split('T')[0]
         const propertyStatus = entryDate && entryDate <= today ? 'rented' : 'upcoming'
-        const { error: propError } = await supabase.from('properties').update({ status: propertyStatus }).eq('id', doc.property_id)
-        console.log('Property update error:', propError)
+        await supabase.from('properties').update({ status: propertyStatus }).eq('id', currentPropertyId)
       }
 
-      if (doc.tenant_signature) {
+      if (docState.tenant_signature) {
         await fetch('/api/documents/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -174,15 +193,21 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <span className="text-sm text-slate-500">{typeLabels[doc.type as keyof typeof typeLabels]}</span>
-        <Badge variant={sc?.color ?? 'secondary'}>{sc?.label ?? doc.status}</Badge>
+        <span className="text-sm text-slate-500">{typeLabels[docState.type as keyof typeof typeLabels]}</span>
+        <Badge variant={sc?.color ?? 'secondary'}>{sc?.label ?? docState.status}</Badge>
       </div>
 
       <StepIndicator current={step} />
 
       {/* ── STEP 1 : Wizard ──────────────────────────────────── */}
       {step === 1 && (
-        <DocumentWizard doc={doc} onSave={handleSaveContent} />
+        <DocumentWizard
+          doc={docState}
+          onSave={handleSaveContent}
+          properties={properties}
+          tenants={tenants}
+          userId={userId}
+        />
       )}
 
       {/* ── STEP 2 : Signature ───────────────────────────────── */}
@@ -244,16 +269,16 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
             </div>
           )}
 
-          {doc.status === 'pending_tenant_signature' ? (
+          {docState.status === 'pending_tenant_signature' ? (
             <div className="flex items-center gap-2 bg-purple-50 rounded-lg p-3 text-sm text-purple-700">
               <Clock className="h-4 w-4 text-purple-400 flex-shrink-0" />
               Lien de signature déjà envoyé — en attente de la signature du locataire
             </div>
-          ) : doc.sent_at ? (
+          ) : docState.sent_at ? (
             <div className="flex items-center gap-2 bg-slate-50 rounded-lg p-3 text-sm text-slate-600">
               <Clock className="h-4 w-4 text-slate-400 flex-shrink-0" />
               Document déjà envoyé le{' '}
-              {new Date(doc.sent_at).toLocaleDateString('fr-FR', {
+              {new Date(docState.sent_at).toLocaleDateString('fr-FR', {
                 day: 'numeric', month: 'long', year: 'numeric',
               })}
             </div>
@@ -264,7 +289,7 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
           )}
 
           <div className="flex gap-2">
-            {doc.status !== 'pending_tenant_signature' && !doc.sent_at && (
+            {docState.status !== 'pending_tenant_signature' && !docState.sent_at && (
               <Button
                 onClick={handleSend}
                 disabled={sending}
@@ -279,7 +304,7 @@ export default function DocumentDetail({ document: doc, onSigned }: Props) {
               </Button>
             )}
             <Button variant="outline" onClick={onSigned} className="flex-1">
-              {doc.status === 'pending_tenant_signature' || doc.sent_at ? 'Fermer' : 'Plus tard'}
+              {docState.status === 'pending_tenant_signature' || docState.sent_at ? 'Fermer' : 'Plus tard'}
             </Button>
           </div>
 

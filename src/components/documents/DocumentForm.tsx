@@ -187,6 +187,28 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
     setCreatingTenant(false)
   }
 
+  const createLease = async () => {
+    setLoading(true)
+    const { data: inserted, error } = await supabase
+      .from('documents')
+      .insert({
+        owner_id: userId,
+        type: 'lease',
+        title: 'Contrat de bail',
+        content: {},
+        status: 'draft',
+      })
+      .select('*, property:properties(*), tenant:tenants(*)')
+      .single()
+
+    if (error) {
+      toast.error('Erreur : ' + error.message)
+    } else {
+      onSuccess(inserted)
+    }
+    setLoading(false)
+  }
+
   const createDocument = async () => {
     setLoading(true)
 
@@ -247,19 +269,37 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label>Type de document</Label>
-          <Select value={docType} onValueChange={handleTypeChange}>
-            <SelectTrigger className="w-full">
-              <TriggerLabel value={typeLabels[docType]} placeholder="Type de document" />
-            </SelectTrigger>
-            <SelectContent>
-              {docTypes.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Type de document</Label>
+        <Select value={docType} onValueChange={handleTypeChange}>
+          <SelectTrigger className="w-full">
+            <TriggerLabel value={typeLabels[docType]} placeholder="Type de document" />
+          </SelectTrigger>
+          <SelectContent>
+            {docTypes.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {docType === 'lease' ? (
+        <div className="py-3 space-y-3">
+          <p className="text-sm text-slate-500">
+            Le bail sera configuré étape par étape via un assistant dédié.
+          </p>
+          <Button
+            onClick={createLease}
+            disabled={loading}
+            className="w-full text-[#063B26] font-semibold"
+            style={{ backgroundColor: '#CFFF92' }}
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Créer un contrat de bail
+          </Button>
         </div>
+      ) : (
+      <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label>Titre</Label>
           <Input
@@ -531,5 +571,7 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
         Créer le document
       </Button>
     </form>
+      )}
+    </div>
   )
 }
