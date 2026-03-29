@@ -341,9 +341,15 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
     setCreatingProperty(false)
     if (error || !data) { toast.error('Erreur : ' + error?.message); return }
     setLocalProperties(prev => [...prev, data])
+    setPropertyId(data.id)
+    setForm(prev => ({
+      ...prev,
+      'Loyer mensuel (€)': newPropertyForm.monthly_rent,
+      'Charges (€)':       newPropertyForm.charges,
+      'Depot de garantie (€)': newPropertyForm.deposit,
+    }))
     setNewPropertyForm({ address: '', postal_code: '', city: '', type: 'apartment', monthly_rent: '', charges: '', deposit: '' })
     setShowNewProperty(false)
-    await handlePropertyChange(data.id)
   }
 
   // ── Property selection ────────────────────────────────────────────────────
@@ -607,7 +613,7 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
             </div>
           </div>
         ) : (
-          <Button type="button" variant="outline" size="sm" onClick={() => setShowNewProperty(true)} className="flex items-center gap-1.5">
+          <Button type="button" variant="outline" size="sm" onClick={() => { setShowNewProperty(true); setPropertyId(null) }} className="flex items-center gap-1.5">
             <Plus className="h-3.5 w-3.5" /> Nouveau bien
           </Button>
         )}
