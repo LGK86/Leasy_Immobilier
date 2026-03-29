@@ -196,6 +196,11 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
   const [rentSplit, setRentSplit]       = useState<Record<string, number>>({})
 
   // Inline new tenant form
+  const [localProperties, setLocalProperties] = useState<{ id: string; address: string; city: string }[]>(properties)
+  const [showNewProperty, setShowNewProperty]   = useState(false)
+  const [newPropertyForm, setNewPropertyForm]   = useState({ address: '', postal_code: '', city: '', type: 'Appartement', monthly_rent: '', charges: '', deposit: '' })
+  const [creatingProperty, setCreatingProperty] = useState(false)
+
   const [showNewTenant, setShowNewTenant]   = useState(false)
   const [newTenantForm, setNewTenantForm]   = useState({ first_name: '', last_name: '', email: '', phone: '' })
   const [creatingTenant, setCreatingTenant] = useState(false)
@@ -311,6 +316,34 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
       setShowNewTenant(false)
     }
     setCreatingTenant(false)
+  }
+
+  // ── Property creation ─────────────────────────────────────────────────────
+
+  const handleCreateProperty = async () => {
+    if (!newPropertyForm.address || !newPropertyForm.city) return
+    setCreatingProperty(true)
+    const { data, error } = await supabase
+      .from('properties')
+      .insert({
+        owner_id: userId,
+        address: newPropertyForm.address,
+        postal_code: newPropertyForm.postal_code || null,
+        city: newPropertyForm.city,
+        type: newPropertyForm.type,
+        monthly_rent: parseFloat(newPropertyForm.monthly_rent) || 0,
+        charges: parseFloat(newPropertyForm.charges) || 0,
+        deposit: parseFloat(newPropertyForm.deposit) || 0,
+        status: 'vacant',
+      })
+      .select('id, address, city')
+      .single()
+    setCreatingProperty(false)
+    if (error || !data) { toast.error('Erreur : ' + error?.message); return }
+    setLocalProperties(prev => [...prev, data])
+    setNewPropertyForm({ address: '', postal_code: '', city: '', type: 'Appartement', monthly_rent: '', charges: '', deposit: '' })
+    setShowNewProperty(false)
+    await handlePropertyChange(data.id)
   }
 
   // ── Property selection ────────────────────────────────────────────────────
@@ -451,7 +484,7 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
       ? localTenants.filter(t => tenantIds.includes(t.id))
       : tenantDetails
     const selectedProp = docType === 'lease'
-      ? properties.find(p => p.id === propertyId)
+      ? localProperties.find(p => p.id === propertyId)
       : doc?.property
 
     return (
@@ -511,32 +544,75 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
   // ── LEASE: Le bien ────────────────────────────────────────────────────────
 
   const renderLeBien = () => {
-    const selectedProp = properties.find(p => p.id === propertyId)
+    const selectedProp = localProperties.find(p => p.id === propertyId)
     return (
       <div className="space-y-4">
-        <LF label="Sélectionner le bien">
-          <Select value={propertyId || undefined} onValueChange={handlePropertyChange}>
-            <SelectTrigger className="w-full">
-              <span className="flex-1 text-left truncate text-sm">
-                {selectedProp
-                  ? `${selectedProp.address}, ${selectedProp.city}`
-                  : <span className="text-muted-foreground">Choisir un bien</span>}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              {properties.map(p => (
-                <SelectItem key={p.id} value={p.id}>{p.address}, {p.city}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </LF>
+        {localProperties.length > 0 && (
+          <LF label="Sélectionner le bien">
+            <Select value={propertyId || undefined} onValueChange={handlePropertyChange}>
+              <SelectTrigger className="w-full">
+                <span className="flex-1 text-left truncate text-sm">
+                  {selectedProp
+                    ? `${selectedProp.address}, ${selectedProp.city}`
+                    : <span className="text-muted-foreground">Choisir un bien</span>}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {localProperties.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.address}, {p.city}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </LF>
+        )}
+
         {selectedProp && (
           <div className="flex items-center gap-2 bg-emerald-50 rounded-lg p-3 text-sm text-emerald-700">
             <Building className="h-4 w-4 text-emerald-500 flex-shrink-0" />
             {selectedProp.address}, {selectedProp.city}
           </div>
         )}
-        {!propertyId && <p className="text-xs text-slate-400">Sélectionnez un bien pour continuer</p>}
+
+        {showNewProperty ? (
+          <div className="border border-slate-200 rounded-lg p-4 space-y-3 bg-slate-50">
+            <p className="text-xs font-semibold text-slate-600">Nouveau bien</p>
+            <TF label="Adresse *"    value={newPropertyForm.address}     onChange={v => setNewPropertyForm(f => ({ ...f, address: v }))}     placeholder="12 rue de la Paix" />
+            <div className="grid grid-cols-2 gap-2">
+              <TF label="Code postal" value={newPropertyForm.postal_code} onChange={v => setNewPropertyForm(f => ({ ...f, postal_code: v }))} placeholder="75001" />
+              <TF label="Ville *"     value={newPropertyForm.city}        onChange={v => setNewPropertyForm(f => ({ ...f, city: v }))}        placeholder="Paris" />
+            </div>
+            <SF label="Type de bien" value={newPropertyForm.type} onChange={v => setNewPropertyForm(f => ({ ...f, type: v }))}
+              options={[
+                { value: 'Appartement', label: 'Appartement' },
+                { value: 'Maison',      label: 'Maison' },
+                { value: 'Studio',      label: 'Studio' },
+                { value: 'Chambre',     label: 'Chambre' },
+                { value: 'Autre',       label: 'Autre' },
+              ]}
+            />
+            <div className="grid grid-cols-3 gap-2">
+              <TF label="Loyer (€)"   value={newPropertyForm.monthly_rent} onChange={v => setNewPropertyForm(f => ({ ...f, monthly_rent: v }))} placeholder="800" />
+              <TF label="Charges (€)" value={newPropertyForm.charges}      onChange={v => setNewPropertyForm(f => ({ ...f, charges: v }))}      placeholder="50" />
+              <TF label="Dépôt (€)"   value={newPropertyForm.deposit}      onChange={v => setNewPropertyForm(f => ({ ...f, deposit: v }))}      placeholder="800" />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowNewProperty(false)}>Annuler</Button>
+              <Button type="button" size="sm" onClick={handleCreateProperty}
+                disabled={creatingProperty || !newPropertyForm.address || !newPropertyForm.city}
+                className="text-[#063B26] font-semibold" style={{ backgroundColor: '#CFFF92' }}
+              >
+                {creatingProperty ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                Créer et sélectionner
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button type="button" variant="outline" size="sm" onClick={() => setShowNewProperty(true)} className="flex items-center gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Nouveau bien
+          </Button>
+        )}
+
+        {!propertyId && !showNewProperty && <p className="text-xs text-slate-400">Sélectionnez ou créez un bien pour continuer</p>}
       </div>
     )
   }
