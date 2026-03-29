@@ -41,6 +41,7 @@ interface Props {
 export default function DocumentList({ documents, properties, tenants, userId }: Props) {
   const [openForm, setOpenForm] = useState(false)
   const [openDetail, setOpenDetail] = useState<any>(null)
+  const [openLeaseCreation, setOpenLeaseCreation] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [generating, setGenerating] = useState<string | null>(null)
   const router = useRouter()
@@ -183,7 +184,7 @@ export default function DocumentList({ documents, properties, tenants, userId }:
             properties={properties}
             tenants={tenants}
             userId={userId}
-            onSuccess={(doc) => { setOpenForm(false); router.refresh(); if (doc) setOpenDetail(doc) }}
+            onSuccess={(doc) => { setOpenForm(false); router.refresh(); if (doc) setOpenDetail(doc); else setOpenLeaseCreation(true) }}
           />
         </DialogContent>
       </Dialog>
@@ -197,6 +198,23 @@ export default function DocumentList({ documents, properties, tenants, userId }:
             <DocumentDetail
               document={openDetail}
               onSigned={() => { setOpenDetail(null); router.refresh() }}
+              properties={properties}
+              tenants={tenants}
+              userId={userId}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {openLeaseCreation && (
+        <Dialog open={openLeaseCreation} onOpenChange={v => { if (!v) { setOpenLeaseCreation(false); router.refresh() } }}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Nouveau contrat de bail</DialogTitle>
+            </DialogHeader>
+            <DocumentDetail
+              document={null}
+              onSigned={() => { setOpenLeaseCreation(false); router.refresh() }}
               properties={properties}
               tenants={tenants}
               userId={userId}

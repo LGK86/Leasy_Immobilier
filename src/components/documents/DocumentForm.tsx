@@ -187,28 +187,6 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
     setCreatingTenant(false)
   }
 
-  const createLease = async () => {
-    setLoading(true)
-    const { data: inserted, error } = await supabase
-      .from('documents')
-      .insert({
-        owner_id: userId,
-        type: 'lease',
-        title: 'Contrat de bail',
-        content: {},
-        status: 'draft',
-      })
-      .select('*, property:properties(*), tenant:tenants(*)')
-      .single()
-
-    if (error) {
-      toast.error('Erreur : ' + error.message)
-    } else {
-      onSuccess(inserted)
-    }
-    setLoading(false)
-  }
-
   const createDocument = async () => {
     setLoading(true)
 
@@ -288,12 +266,10 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
             Le bail sera configuré étape par étape via un assistant dédié.
           </p>
           <Button
-            onClick={createLease}
-            disabled={loading}
+            onClick={() => onSuccess()}
             className="w-full text-[#063B26] font-semibold"
             style={{ backgroundColor: '#CFFF92' }}
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Créer un contrat de bail
           </Button>
         </div>

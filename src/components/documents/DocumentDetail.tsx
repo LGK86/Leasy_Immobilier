@@ -25,14 +25,15 @@ const statusConfig = {
 }
 
 interface Props {
-  document: any
+  document: any | null
   onSigned: () => void
   properties?: { id: string; address: string; city: string }[]
   tenants?: { id: string; first_name: string; last_name: string; property_id: string | null; email?: string | null; phone?: string | null }[]
   userId?: string
 }
 
-function initialStep(doc: any): 1 | 2 | 3 {
+function initialStep(doc: any | null): 1 | 2 | 3 {
+  if (!doc) return 1
   if (doc.owner_signature) return 3
   if (doc.status === 'draft') return 1
   return 2
@@ -79,20 +80,28 @@ export default function DocumentDetail({ document: doc, onSigned, properties, te
   const supabase = createClient()
   const [step, setStep]           = useState<1 | 2 | 3>(initialStep(doc))
   const [docState, setDocState]   = useState<any>(doc)
-  const [ownerSig, setOwnerSig]   = useState<string | null>(doc.owner_signature)
-  const [showCanvas, setShowCanvas] = useState(!doc.owner_signature)
+  const [ownerSig, setOwnerSig]   = useState<string | null>(doc?.owner_signature ?? null)
+  const [showCanvas, setShowCanvas] = useState(!doc?.owner_signature)
   const [loading, setLoading]     = useState(false)
   const [sending, setSending]     = useState(false)
 
-  const sc = statusConfig[docState.status as keyof typeof statusConfig]
+  const sc = docState ? statusConfig[docState.status as keyof typeof statusConfig] : null
+
+  /* ── Wizard: doc created in creation mode ────────────────── */
+  const handleDocCreated = (newDoc: any) => {
+    setDocState(newDoc)
+  }
 
   /* ── Step 1 : wizard complete ────────────────────────────── */
   const handleSaveContent = async (newContent: Record<string, string>) => {
     setLoading(true)
+    const docId = docState?.id
+    if (!docId) { toast.error('Document non initialisé'); setLoading(false); return }
+
     const { error } = await supabase
       .from('documents')
       .update({ content: newContent, updated_at: new Date().toISOString() })
-      .eq('id', doc.id)
+      .eq('id', docId)
 
     if (error) {
       toast.error('Erreur lors de la sauvegarde')
@@ -104,7 +113,7 @@ export default function DocumentDetail({ document: doc, onSigned, properties, te
     const { data: freshDoc } = await supabase
       .from('documents')
       .select('*, property:properties(*), tenant:tenants(*)')
-      .eq('id', doc.id)
+      .eq('id', docId)
       .single()
     if (freshDoc) setDocState(freshDoc)
 
@@ -123,7 +132,7 @@ export default function DocumentDetail({ document: doc, onSigned, properties, te
         status: docState.tenant_signature ? 'finalized' : 'signed',
         updated_at: new Date().toISOString(),
       })
-      .eq('id', doc.id)
+      .eq('id', docState.id)
 
     if (error) {
       toast.error('Erreur lors de la sauvegarde')
@@ -147,7 +156,7 @@ export default function DocumentDetail({ document: doc, onSigned, properties, te
       }
 
       // Mettre à jour le statut du bien si c'est un bail
-      const currentPropertyId = docState.property_id ?? doc.property_id
+      const currentPropertyId = docState.property_id ?? doc?.property_id
       if (currentPropertyId && docState.type === 'lease') {
         const entryDate = (docState.content?.["Date d'entree"] || docState.content?.["Date d'entrée"]) as string | undefined
         const today = new Date().toISOString().split('T')[0]
@@ -159,7 +168,7 @@ export default function DocumentDetail({ document: doc, onSigned, properties, te
         await fetch('/api/documents/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ documentId: doc.id }),
+          body: JSON.stringify({ documentId: docState.id }),
         })
       }
       setStep(3)
@@ -174,7 +183,7 @@ export default function DocumentDetail({ document: doc, onSigned, properties, te
       const res = await fetch('/api/documents/send-signing-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentId: doc.id }),
+        body: JSON.stringify({ documentId: docState?.id }),
       })
       if (res.ok) {
         toast.success('Lien de signature envoyé au locataire')
@@ -192,10 +201,12 @@ export default function DocumentDetail({ document: doc, onSigned, properties, te
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-slate-500">{typeLabels[docState.type as keyof typeof typeLabels]}</span>
-        <Badge variant={sc?.color ?? 'secondary'}>{sc?.label ?? docState.status}</Badge>
-      </div>
+      {docState && (
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-slate-500">{typeLabels[docState.type as keyof typeof typeLabels]}</span>
+          <Badge variant={sc?.color ?? 'secondary'}>{sc?.label ?? docState.status}</Badge>
+        </div>
+      )}
 
       <StepIndicator current={step} />
 
@@ -204,6 +215,7 @@ export default function DocumentDetail({ document: doc, onSigned, properties, te
         <DocumentWizard
           doc={docState}
           onSave={handleSaveContent}
+          onDocCreated={handleDocCreated}
           properties={properties}
           tenants={tenants}
           userId={userId}

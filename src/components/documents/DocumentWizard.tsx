@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
 import { ChevronLeft, ChevronRight, Plus, Trash2, User, Building, X, UserPlus, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,8 +17,9 @@ type InventoryRow = { objet: string; quantite: string; etat: string; commentaire
 type TenantEntry  = { id: string; first_name: string; last_name: string; property_id: string | null; email?: string | null; phone?: string | null }
 
 interface Props {
-  doc: any
+  doc: any | null
   onSave: (content: Record<string, string>) => void
+  onDocCreated?: (doc: any) => void
   properties?: { id: string; address: string; city: string }[]
   tenants?: TenantEntry[]
   userId?: string
@@ -167,11 +169,12 @@ function TA({ label, value, onChange, rows = 4, placeholder }: {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function DocumentWizard({ doc, onSave, properties = [], tenants = [], userId }: Props) {
+export default function DocumentWizard({ doc, onSave, onDocCreated, properties = [], tenants = [], userId }: Props) {
   const supabase = createClient()
+  const docType = doc?.type ?? 'lease'
 
   const flatContent = (): Record<string, string> => {
-    const c = doc.content ?? {}
+    const c = doc?.content ?? {}
     const out: Record<string, string> = {}
     for (const [k, v] of Object.entries(c)) {
       if (!['tenant_ids', 'rent_split', 'acces', 'etat_pieces'].includes(k) && !k.startsWith('mobilier_')) {
@@ -185,8 +188,9 @@ export default function DocumentWizard({ doc, onSave, properties = [], tenants =
   const [form, setForm]       = useState<Record<string, string>>(flatContent)
 
   // Lease-specific state
-  const [propertyId, setPropertyId]     = useState<string | null>(doc.property_id ?? null)
-  const [tenantIds, setTenantIds]       = useState<string[]>(() => initTenantIds(doc.content))
+  const [docId, setDocId]               = useState<string | null>(doc?.id ?? null)
+  const [propertyId, setPropertyId]     = useState<string | null>(doc?.property_id ?? null)
+  const [tenantIds, setTenantIds]       = useState<string[]>(() => initTenantIds(doc?.content))
   const [localTenants, setLocalTenants] = useState<TenantEntry[]>(tenants)
   const [splitRent, setSplitRent]       = useState(false)
   const [rentSplit, setRentSplit]       = useState<Record<string, number>>({})
@@ -195,6 +199,7 @@ export default function DocumentWizard({ doc, onSave, properties = [], tenants =
   const [showNewTenant, setShowNewTenant]   = useState(false)
   const [newTenantForm, setNewTenantForm]   = useState({ first_name: '', last_name: '', email: '', phone: '' })
   const [creatingTenant, setCreatingTenant] = useState(false)
+  const [creatingDoc, setCreatingDoc]       = useState(false)
 
   // Non-lease: fetched for Parties display
   const [tenantDetails, setTenantDetails] = useState<any[]>([])
@@ -202,11 +207,11 @@ export default function DocumentWizard({ doc, onSave, properties = [], tenants =
   const [loadingData, setLoadingData]     = useState(true)
 
   // Complex section state
-  const [keyEntries,    setKeyEntries]    = useState<KeyEntry[]>(() => initKeyEntries(doc.content ?? {}))
-  const [piecesState,   setPiecesState]   = useState<PiecesState>(() => initPiecesState(doc.content ?? {}))
-  const [inventoryRows, setInventoryRows] = useState<Record<string, InventoryRow[]>>(() => initInventoryRows(doc.content ?? {}))
+  const [keyEntries,    setKeyEntries]    = useState<KeyEntry[]>(() => initKeyEntries(doc?.content ?? {}))
+  const [piecesState,   setPiecesState]   = useState<PiecesState>(() => initPiecesState(doc?.content ?? {}))
+  const [inventoryRows, setInventoryRows] = useState<Record<string, InventoryRow[]>>(() => initInventoryRows(doc?.content ?? {}))
 
-  const sections = getSections(doc.type)
+  const sections = getSections(docType)
   const total    = sections.length
 
   useEffect(() => {
@@ -217,8 +222,8 @@ export default function DocumentWizard({ doc, onSave, properties = [], tenants =
         const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
         setProfile(prof)
       }
-      if (doc.type !== 'lease') {
-        const rawIds = doc.content?.tenant_ids
+      if (docType !== 'lease') {
+        const rawIds = doc?.content?.tenant_ids
         let ids: string[] = []
         if (Array.isArray(rawIds)) ids = rawIds
         else if (typeof rawIds === 'string' && rawIds) ids = rawIds.split(',').map((s: string) => s.trim()).filter(Boolean)
@@ -328,39 +333,41 @@ export default function DocumentWizard({ doc, onSave, properties = [], tenants =
   // ── Auto-save (fire and forget) ───────────────────────────────────────────
 
   const autoSave = () => {
+    const id = docId || doc?.id
+    if (!id) return
     const contentForSave: Record<string, unknown> = { ...form }
-    if (doc.type === 'lease') {
+    if (docType === 'lease') {
       contentForSave['tenant_ids'] = tenantIds
       if (splitRent && Object.keys(rentSplit).length > 0) {
         contentForSave['rent_split'] = JSON.stringify(rentSplit)
       }
-    } else if (doc.type === 'entry_inspection' || doc.type === 'exit_inspection') {
+    } else if (docType === 'entry_inspection' || docType === 'exit_inspection') {
       contentForSave['acces']       = JSON.stringify(keyEntries)
       contentForSave['etat_pieces'] = JSON.stringify(piecesState)
-    } else if (doc.type === 'inventory') {
+    } else if (docType === 'inventory') {
       for (const r of INVENTORY_ROOMS) {
         contentForSave[`mobilier_${r.key}`] = JSON.stringify(inventoryRows[r.key] ?? [])
       }
     }
     const updates: Record<string, unknown> = { content: contentForSave, updated_at: new Date().toISOString() }
-    if (doc.type === 'lease') {
+    if (docType === 'lease') {
       updates.property_id = propertyId || null
       updates.tenant_id   = tenantIds[0] || null
     }
-    supabase.from('documents').update(updates).eq('id', doc.id).then(() => {})
+    supabase.from('documents').update(updates).eq('id', id).then(() => {})
   }
 
   const buildFinalContent = (): Record<string, string> => {
     const out: Record<string, string> = { ...form }
-    if (doc.type === 'lease') {
+    if (docType === 'lease') {
       out['tenant_ids'] = tenantIds.join(',')
       if (splitRent && Object.keys(rentSplit).length > 0) {
         out['rent_split'] = JSON.stringify(rentSplit)
       }
-    } else if (doc.type === 'entry_inspection' || doc.type === 'exit_inspection') {
+    } else if (docType === 'entry_inspection' || docType === 'exit_inspection') {
       out['acces']       = JSON.stringify(keyEntries)
       out['etat_pieces'] = JSON.stringify(piecesState)
-    } else if (doc.type === 'inventory') {
+    } else if (docType === 'inventory') {
       for (const r of INVENTORY_ROOMS) {
         out[`mobilier_${r.key}`] = JSON.stringify(inventoryRows[r.key] ?? [])
       }
@@ -369,14 +376,30 @@ export default function DocumentWizard({ doc, onSave, properties = [], tenants =
   }
 
   const canProceed = (): boolean => {
-    if (doc.type === 'lease') {
+    if (docType === 'lease') {
       if (section === 1) return !!propertyId
       if (section === 2) return tenantIds.length > 0
     }
     return true
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    // In creation mode (no doc yet): create the doc at end of section 1 (Le bien)
+    if (!docId && !doc?.id && section === 1 && docType === 'lease') {
+      if (!propertyId) return
+      setCreatingDoc(true)
+      const { data: newDoc, error } = await supabase
+        .from('documents')
+        .insert({ owner_id: userId, type: 'lease', title: 'Contrat de bail', content: {}, status: 'draft', property_id: propertyId })
+        .select('*, property:properties(*), tenant:tenants(*)')
+        .single()
+      setCreatingDoc(false)
+      if (error || !newDoc) { toast.error('Erreur lors de la création'); return }
+      setDocId(newDoc.id)
+      onDocCreated?.(newDoc)
+      setSection(s => s + 1)
+      return
+    }
     autoSave()
     if (section < total) setSection(s => s + 1)
     else onSave(buildFinalContent())
@@ -412,7 +435,7 @@ export default function DocumentWizard({ doc, onSave, properties = [], tenants =
           <ChevronLeft className="h-4 w-4" /> Précédent
         </Button>
       )}
-      <Button size="sm" onClick={handleNext} disabled={!canProceed()}
+      <Button size="sm" onClick={handleNext} disabled={!canProceed() || creatingDoc}
         className="ml-auto flex items-center gap-1 text-[#063B26] font-semibold disabled:opacity-50"
         style={{ backgroundColor: '#CFFF92' }}
       >
@@ -424,12 +447,12 @@ export default function DocumentWizard({ doc, onSave, properties = [], tenants =
   // ── Shared: Parties ───────────────────────────────────────────────────────
 
   const renderParties = () => {
-    const displayTenants = doc.type === 'lease'
+    const displayTenants = docType === 'lease'
       ? localTenants.filter(t => tenantIds.includes(t.id))
       : tenantDetails
-    const selectedProp = doc.type === 'lease'
+    const selectedProp = docType === 'lease'
       ? properties.find(p => p.id === propertyId)
-      : doc.property
+      : doc?.property
 
     return (
       <div className="space-y-3">
@@ -739,7 +762,7 @@ export default function DocumentWizard({ doc, onSave, properties = [], tenants =
     if (section === 2) return (
       <div className="grid grid-cols-1 gap-3">
         <TF label="Type de logement"   value={form['Type de logement'] ?? ''}   onChange={f('Type de logement')} placeholder="ex: Appartement T2" />
-        <TF label="Adresse"            value={form['Adresse'] ?? (doc.property?.address ?? '')} onChange={f('Adresse')} />
+        <TF label="Adresse"            value={form['Adresse'] ?? (doc?.property?.address ?? '')} onChange={f('Adresse')} />
         <div className="grid grid-cols-2 gap-3">
           <TF label="Surface (m²)"     value={form['Surface'] ?? ''}          onChange={f('Surface')} />
           <TF label="Nombre de pièces" value={form['Nombre de pieces'] ?? ''} onChange={f('Nombre de pieces')} />
@@ -918,9 +941,9 @@ export default function DocumentWizard({ doc, onSave, properties = [], tenants =
   // ── Render ────────────────────────────────────────────────────────────────
 
   let sectionContent: React.ReactNode
-  if (doc.type === 'lease')                                                    sectionContent = renderLease()
-  else if (doc.type === 'entry_inspection' || doc.type === 'exit_inspection') sectionContent = renderInspection()
-  else if (doc.type === 'inventory')                                           sectionContent = renderInventory()
+  if (docType === 'lease')                                                    sectionContent = renderLease()
+  else if (docType === 'entry_inspection' || docType === 'exit_inspection') sectionContent = renderInspection()
+  else if (docType === 'inventory')                                           sectionContent = renderInventory()
   else                                                                         sectionContent = renderGeneric()
 
   return (
