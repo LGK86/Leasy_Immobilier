@@ -198,7 +198,7 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
   // Inline new tenant form
   const [localProperties, setLocalProperties] = useState<{ id: string; address: string; city: string }[]>(properties)
   const [showNewProperty, setShowNewProperty]   = useState(false)
-  const [newPropertyForm, setNewPropertyForm]   = useState({ address: '', postal_code: '', city: '', type: 'Appartement', monthly_rent: '', charges: '', deposit: '' })
+  const [newPropertyForm, setNewPropertyForm]   = useState({ address: '', postal_code: '', city: '', type: 'apartment', monthly_rent: '', charges: '', deposit: '' })
   const [creatingProperty, setCreatingProperty] = useState(false)
 
   const [showNewTenant, setShowNewTenant]   = useState(false)
@@ -341,7 +341,7 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
     setCreatingProperty(false)
     if (error || !data) { toast.error('Erreur : ' + error?.message); return }
     setLocalProperties(prev => [...prev, data])
-    setNewPropertyForm({ address: '', postal_code: '', city: '', type: 'Appartement', monthly_rent: '', charges: '', deposit: '' })
+    setNewPropertyForm({ address: '', postal_code: '', city: '', type: 'apartment', monthly_rent: '', charges: '', deposit: '' })
     setShowNewProperty(false)
     await handlePropertyChange(data.id)
   }
@@ -583,11 +583,11 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
             </div>
             <SF label="Type de bien" value={newPropertyForm.type} onChange={v => setNewPropertyForm(f => ({ ...f, type: v }))}
               options={[
-                { value: 'Appartement', label: 'Appartement' },
-                { value: 'Maison',      label: 'Maison' },
-                { value: 'Studio',      label: 'Studio' },
-                { value: 'Chambre',     label: 'Chambre' },
-                { value: 'Autre',       label: 'Autre' },
+                { value: 'apartment', label: 'Appartement' },
+                { value: 'house',     label: 'Maison' },
+                { value: 'studio',    label: 'Studio' },
+                { value: 'room',      label: 'Chambre' },
+                { value: 'other',     label: 'Autre' },
               ]}
             />
             <div className="grid grid-cols-3 gap-2">
