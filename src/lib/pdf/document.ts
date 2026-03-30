@@ -470,7 +470,7 @@ const PROP_TYPE_LABELS: Record<string, string> = {
   apartment: 'Appartement', house: 'Maison', studio: 'Studio', room: 'Chambre', other: 'Autre',
 }
 
-async function generateInspectionPDF(data: DocumentData): Promise<Uint8Array> {
+export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create()
   const HLV  = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const HLVB = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
@@ -748,7 +748,7 @@ async function generateInspectionPDF(data: DocumentData): Promise<Uint8Array> {
 
 // ── Inventory PDF ─────────────────────────────────────────────────────────────
 
-async function generateInventoryPDF(data: DocumentData): Promise<Uint8Array> {
+export async function generateInventoryPDF(data: DocumentData): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create()
   const HLV  = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const HLVB = await pdfDoc.embedFont(StandardFonts.HelveticaBold)

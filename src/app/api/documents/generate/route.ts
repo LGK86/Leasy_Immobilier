@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { generateDocumentPDF } from '@/lib/pdf/document'
+import { generateDocumentPDF, generateInspectionPDF, generateInventoryPDF } from '@/lib/pdf/document'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -50,8 +50,8 @@ export async function POST(request: NextRequest) {
     signature: tenantSignatures[t.id] ?? doc.tenant_signature ?? null,
   }))
 
-  const pdfBytes = await generateDocumentPDF({
-    type: doc.type,
+  const pdfData = {
+    type: doc.type as 'lease' | 'entry_inspection' | 'exit_inspection' | 'inventory',
     title: doc.title,
     ownerName: `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim(),
     ownerAddress: `${profile?.address ?? ''}, ${profile?.postal_code ?? ''} ${profile?.city ?? ''}`,
@@ -65,7 +65,16 @@ export async function POST(request: NextRequest) {
     content: doc.content ?? {},
     ownerSignature: doc.owner_signature,
     date: doc.created_at,
-  })
+  }
+
+  let pdfBytes: Uint8Array
+  if (doc.type === 'entry_inspection' || doc.type === 'exit_inspection') {
+    pdfBytes = await generateInspectionPDF(pdfData)
+  } else if (doc.type === 'inventory') {
+    pdfBytes = await generateInventoryPDF(pdfData)
+  } else {
+    pdfBytes = await generateDocumentPDF(pdfData)
+  }
 
   const fileName = `${user.id}/documents/${doc.id}.pdf`
   const { error: uploadError } = await supabase.storage
