@@ -69,6 +69,7 @@ export interface InspectionContent {
   location: string
   copies_count: number
   linked_inspection_id?: string | null
+  tenant_ids?: string[]
 }
 
 // --- Inventaire ---
@@ -96,4 +97,5 @@ export interface InventoryContent {
   general_observations: string
   location: string
   copies_count: number
+  tenant_ids?: string[]
 }

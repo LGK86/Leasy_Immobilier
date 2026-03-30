@@ -205,7 +205,7 @@ export default function DocumentList({ documents, properties, tenants, userId }:
 
       {openDetail && (
         <Dialog open={!!openDetail} onOpenChange={() => setOpenDetail(null)}>
-          <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[90vw] max-w-[90vw] sm:max-w-[90vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{openDetail.title}</DialogTitle>
             </DialogHeader>
@@ -222,7 +222,7 @@ export default function DocumentList({ documents, properties, tenants, userId }:
 
       {openLeaseCreation && (
         <Dialog open={openLeaseCreation} onOpenChange={v => { if (!v) { setOpenLeaseCreation(false); router.refresh() } }}>
-          <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[90vw] max-w-[90vw] sm:max-w-[90vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Nouveau contrat de bail</DialogTitle>
             </DialogHeader>
@@ -242,7 +242,7 @@ export default function DocumentList({ documents, properties, tenants, userId }:
           open={!!openInspectionCreation}
           onOpenChange={v => { if (!v) { setOpenInspectionCreation(null); router.refresh() } }}
         >
-          <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[90vw] max-w-[90vw] sm:max-w-[90vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{typeLabels[openInspectionCreation.type as keyof typeof typeLabels]}</DialogTitle>
             </DialogHeader>

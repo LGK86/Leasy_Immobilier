@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Plus, Trash2, ChevronLeft, ChevronRight, Loader2, Send, CheckCircle2 } from 'lucide-react'
+import { Plus, Trash2, ChevronLeft, ChevronRight, Loader2, Send, CheckCircle2, X } from 'lucide-react'
 import SignatureCanvas from './SignatureCanvas'
 import type {
   InspectionContent, InventoryContent,
@@ -34,45 +34,48 @@ interface Props {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CONDITION_OPTIONS = [
-  { value: 'A',  label: 'A — Tres bon / Neuf' },
-  { value: 'B',  label: 'B — Bon etat' },
-  { value: 'C',  label: "C — Etat d usage" },
-  { value: 'D',  label: 'D — Mauvais etat' },
+  { value: 'A',  label: 'A — Très bon / Neuf' },
+  { value: 'B',  label: 'B — Bon état' },
+  { value: 'C',  label: "C — État d'usage" },
+  { value: 'D',  label: 'D — Mauvais état' },
   { value: 'HS', label: 'HS — Hors service' },
-  { value: 'NV', label: 'NV — Non verifie' },
+  { value: 'NV', label: 'NV — Non vérifié' },
 ]
 
 const INV_CONDITION_OPTIONS = [
   { value: 'Neuf',       label: 'Neuf' },
   { value: 'Bon',        label: 'Bon' },
   { value: 'Moyen',      label: 'Moyen' },
-  { value: 'Tres abime', label: 'Tres abime' },
+  { value: 'Tres abime', label: 'Très abîmé' },
 ]
 
 const TYPE_LABELS: Record<string, string> = {
-  entry_inspection: "Etat des lieux d entree",
-  exit_inspection:  "Etat des lieux de sortie",
-  inventory:        "Inventaire",
+  entry_inspection: "État des lieux d'entrée",
+  exit_inspection:  "État des lieux de sortie",
+  inventory:        "Inventaire du mobilier",
 }
 
 // ─── Section helpers ──────────────────────────────────────────────────────────
 
 function getRoomStart(isInventory: boolean): number { return isInventory ? 1 : 4 }
 function getTotalSections(isInventory: boolean, roomCount: number): number {
-  return isInventory ? 2 + roomCount : 5 + roomCount
+  // +1 for separate Signatures section at the end
+  return isInventory ? 3 + roomCount : 6 + roomCount
 }
 function getSectionLabel(isInventory: boolean, index: number, rooms: { name: string }[]): string {
   if (isInventory) {
     if (index === 0) return 'Informations'
     if (index <= rooms.length) return rooms[index - 1].name
-    return 'Observations'
+    if (index === rooms.length + 1) return 'Observations'
+    return 'Signatures'
   }
   if (index === 0) return 'Informations'
-  if (index === 1) return 'Acces'
+  if (index === 1) return 'Accès'
   if (index === 2) return 'Accessoires'
   if (index === 3) return 'Chauffage'
   if (index <= 3 + rooms.length) return rooms[index - 4].name
-  return 'Observations'
+  if (index === 4 + rooms.length) return 'Observations'
+  return 'Signatures'
 }
 
 // ─── Small UI helpers ─────────────────────────────────────────────────────────
@@ -83,16 +86,6 @@ function LF({ label, children }: { label: string; children: React.ReactNode }) {
       <label className="text-xs font-medium text-slate-500">{label}</label>
       {children}
     </div>
-  )
-}
-
-function TF({ label, value, onChange, type = 'text', placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string
-}) {
-  return (
-    <LF label={label}>
-      <Input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="text-sm" />
-    </LF>
   )
 }
 
@@ -124,8 +117,9 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const [saving,              setSaving]              = useState(false)
   const [generating,          setGenerating]          = useState(false)
   const [sigSending,          setSigSending]          = useState(false)
+  const [sigSubStep,          setSigSubStep]          = useState<'sign' | 'send'>('sign')
   const [propertyId,          setPropertyId]          = useState('')
-  const [tenantId,            setTenantId]            = useState('')
+  const [tenantIds,           setTenantIds]           = useState<string[]>([])
   const [surface,             setSurface]             = useState('')
   const [roomsCount,          setRoomsCount]          = useState('')
   const [sectionIndex,        setSectionIndex]        = useState(0)
@@ -147,6 +141,8 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const roomStart   = getRoomStart(isInventory)
   const totalSec    = getTotalSections(isInventory, rooms.length)
   const isLastSec   = sectionIndex === totalSec - 1
+  const isSigSec    = sectionIndex === totalSec - 1
+  const isObsSec    = sectionIndex === totalSec - 2
   const isRoomSec   = sectionIndex >= roomStart && sectionIndex < roomStart + rooms.length
   const roomIdx     = isRoomSec ? sectionIndex - roomStart : -1
   const sectionLabel = getSectionLabel(isInventory, sectionIndex, rooms)
@@ -161,7 +157,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   // ── Property selection with auto-fill ────────────────────────
   const handlePropertySelect = async (pid: string) => {
     setPropertyId(pid)
-    setTenantId('')
+    setTenantIds([])
     if (pid) {
       const { data: prop } = await supabase
         .from('properties')
@@ -174,6 +170,13 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
       }
     }
   }
+
+  // ── Tenant multi-select helpers ───────────────────────────────
+  const addTenant = (id: string) => {
+    if (!id || tenantIds.includes(id)) return
+    setTenantIds(prev => [...prev, id])
+  }
+  const removeTenant = (id: string) => setTenantIds(prev => prev.filter(t => t !== id))
 
   // ── Generic content updater ───────────────────────────────────
   const setField = (key: string, value: unknown) => {
@@ -190,8 +193,8 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
 
   const addRoom = () => {
     const newRoom = isInventory
-      ? { id: `room_${Date.now()}`, name: 'Nouvelle piece', order: rooms.length + 1, items: [] }
-      : { id: `room_${Date.now()}`, name: 'Nouvelle piece', order: rooms.length + 1, elements: [], remarks: '' }
+      ? { id: `room_${Date.now()}`, name: 'Nouvelle pièce', order: rooms.length + 1, items: [] }
+      : { id: `room_${Date.now()}`, name: 'Nouvelle pièce', order: rooms.length + 1, elements: [], remarks: '' }
     const newRooms = [...rooms, newRoom]
     setContent(prev => ({ ...prev, rooms: newRooms }) as InspectionContent | InventoryContent)
     setSectionIndex(roomStart + newRooms.length - 1)
@@ -213,11 +216,12 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
       ...content,
       surface:     parseFloat(surface) || null,
       rooms_count: parseInt(roomsCount) || null,
+      tenant_ids:  tenantIds,
     }
     return {
       owner_id:        userId,
       property_id:     propertyId || null,
-      tenant_id:       tenantId   || null,
+      tenant_id:       tenantIds[0] || null,
       type,
       title,
       content:         contentWithMeta,
@@ -241,18 +245,18 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   }
 
   const handleSaveDraft = async () => {
-    if (!propertyId) { toast.error('Veuillez selectionner un bien'); return }
+    if (!propertyId) { toast.error('Veuillez sélectionner un bien'); return }
     setSaving(true)
     const id = await persistDraft()
     if (id) {
       await onSave?.(content, 'draft')
-      toast.success('Brouillon enregistre')
+      toast.success('Brouillon enregistré')
     }
     setSaving(false)
   }
 
   const handleGenerate = async () => {
-    if (!propertyId) { toast.error('Veuillez selectionner un bien'); return }
+    if (!propertyId) { toast.error('Veuillez sélectionner un bien'); return }
     setGenerating(true)
     const id = await persistDraft()
     if (!id) { setGenerating(false); return }
@@ -265,20 +269,20 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
       const data = await res.json()
       if (data.success) {
         await onSave?.(content, 'sent')
-        toast.success('Document genere')
+        toast.success('Document généré')
         onClose()
       } else {
-        toast.error('Erreur generation : ' + (data.error ?? 'inconnue'))
+        toast.error('Erreur génération : ' + (data.error ?? 'inconnue'))
       }
     } catch {
-      toast.error('Erreur lors de la generation')
+      toast.error('Erreur lors de la génération')
     }
     setGenerating(false)
   }
 
   const handleSendSigningLink = async () => {
-    if (!propertyId) { toast.error('Veuillez selectionner un bien'); return }
-    if (!tenantId)   { toast.error('Veuillez selectionner un locataire'); return }
+    if (!propertyId) { toast.error('Veuillez sélectionner un bien'); return }
+    if (tenantIds.length === 0) { toast.error('Veuillez sélectionner au moins un locataire'); return }
     setSigSending(true)
     const id = await persistDraft()
     if (!id) { setSigSending(false); return }
@@ -294,13 +298,13 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
         body: JSON.stringify({ documentId: id }),
       })
       if (res.ok) {
-        toast.success('Lien de signature envoye au locataire')
+        toast.success('Lien de signature envoyé au locataire')
         onClose()
       } else {
-        toast.error("Erreur lors de l envoi")
+        toast.error("Erreur lors de l'envoi")
       }
     } catch {
-      toast.error("Erreur lors de l envoi")
+      toast.error("Erreur lors de l'envoi")
     }
     setSigSending(false)
   }
@@ -309,6 +313,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
 
   const renderInfoSection = () => {
     const filteredTenants = tenants.filter(t => !propertyId || t.property_id === propertyId || t.property_id === null)
+    const unselectedTenants = filteredTenants.filter(t => !tenantIds.includes(t.id))
     return (
       <div className="space-y-4">
         <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
@@ -324,7 +329,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
               <span className="flex-1 text-left truncate text-sm">
                 {propertyId
                   ? (() => { const p = properties.find(p => p.id === propertyId); return p ? `${p.address}, ${p.city}` : '' })()
-                  : <span className="text-muted-foreground">Selectionner un bien</span>}
+                  : <span className="text-muted-foreground">Sélectionner un bien</span>}
               </span>
             </SelectTrigger>
             <SelectContent>
@@ -333,39 +338,59 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
           </Select>
         </LF>
 
-        <LF label="Locataire *">
-          <Select
-            value={tenantId || undefined}
-            onValueChange={(v: string | null) => setTenantId(v ?? '')}
-          >
-            <SelectTrigger className="w-full">
-              <span className="flex-1 text-left truncate text-sm">
-                {tenantId
-                  ? (() => { const t = filteredTenants.find(t => t.id === tenantId); return t ? `${t.first_name} ${t.last_name}` : '' })()
-                  : <span className="text-muted-foreground">Selectionner un locataire</span>}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              {filteredTenants.map(t => (
-                <SelectItem key={t.id} value={t.id}>{t.first_name} {t.last_name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </LF>
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-slate-500">Locataire(s) *</label>
+
+          {tenantIds.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {tenantIds.map(id => {
+                const t = filteredTenants.find(t => t.id === id)
+                if (!t) return null
+                return (
+                  <div key={id} className="flex items-center gap-1 bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded-full">
+                    <span>{t.first_name} {t.last_name}</span>
+                    <button type="button" onClick={() => removeTenant(id)} className="text-slate-400 hover:text-red-500">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {unselectedTenants.length > 0 && (
+            <Select onValueChange={(v: string | null) => { if (v) addTenant(v) }}>
+              <SelectTrigger className="w-full">
+                <span className="flex-1 text-left truncate text-sm text-muted-foreground">
+                  Ajouter un locataire…
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {unselectedTenants.map(t => (
+                  <SelectItem key={t.id} value={t.id}>{t.first_name} {t.last_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <TF
-            label={isInventory ? "Date de l inventaire *" : "Date de l etat des lieux *"}
-            value={isInventory ? vc.inventory_date : ic.inspection_date}
-            onChange={v => setField(isInventory ? 'inventory_date' : 'inspection_date', v)}
-            type="date"
-          />
-          <TF
-            label="Nombre d exemplaires"
-            value={String(content.copies_count)}
-            onChange={v => setField('copies_count', parseInt(v) || 2)}
-            type="number"
-          />
+          <LF label={isInventory ? "Date de l'inventaire *" : "Date de l'état des lieux *"}>
+            <Input
+              type="date"
+              value={isInventory ? vc.inventory_date : ic.inspection_date}
+              onChange={e => setField(isInventory ? 'inventory_date' : 'inspection_date', e.target.value)}
+              className="text-sm"
+            />
+          </LF>
+          <LF label="Nombre d'exemplaires">
+            <Input
+              type="number"
+              value={String(content.copies_count)}
+              onChange={e => setField('copies_count', parseInt(e.target.value) || 2)}
+              className="text-sm"
+            />
+          </LF>
         </div>
 
         {!isInventory && (
@@ -374,14 +399,14 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
               value={ic.description}
               onChange={e => setField('description', e.target.value)}
               rows={3}
-              placeholder="Appartement de 2 pieces, 45m2..."
+              placeholder="Appartement de 2 pièces, 45 m²…"
               className="text-sm resize-none"
             />
           </LF>
         )}
 
         {isInventory && entryInspections.length > 0 && (
-          <LF label="Etat des lieux d entree associe (optionnel)">
+          <LF label="État des lieux d'entrée associé (optionnel)">
             <Select
               value={vc.linked_inspection_id ?? 'none'}
               onValueChange={(v: string | null) => setField('linked_inspection_id', (!v || v === 'none') ? null : v)}
@@ -389,7 +414,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
               <SelectTrigger className="w-full">
                 <span className="flex-1 text-left truncate text-sm">
                   {vc.linked_inspection_id
-                    ? entryInspections.find(d => d.id === vc.linked_inspection_id)?.title ?? 'Selectionne'
+                    ? entryInspections.find(d => d.id === vc.linked_inspection_id)?.title ?? 'Sélectionné'
                     : <span className="text-muted-foreground">Aucun</span>}
                 </span>
               </SelectTrigger>
@@ -418,11 +443,11 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
                 className="h-4 w-4 accent-[#063B26]"
               />
               <label htmlFor="link_entry_inspection" className="text-sm text-slate-700 cursor-pointer">
-                Cloturer un etat des lieux d entree existant ?
+                Clôturer un état des lieux d&apos;entrée existant ?
               </label>
             </div>
             {linkEntryInspection && (
-              <LF label="Selectionner l etat des lieux d entree">
+              <LF label="Sélectionner l'état des lieux d'entrée">
                 <Select
                   value={linkedEntryId || undefined}
                   onValueChange={(v: string | null) => {
@@ -448,13 +473,13 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
                   <SelectTrigger className="w-full">
                     <span className="flex-1 text-left truncate text-sm">
                       {linkedEntryId
-                        ? availableEntryInspections.find(d => d.id === linkedEntryId)?.title ?? 'Selectionne'
-                        : <span className="text-muted-foreground">Choisir un etat des lieux d entree</span>}
+                        ? availableEntryInspections.find(d => d.id === linkedEntryId)?.title ?? 'Sélectionné'
+                        : <span className="text-muted-foreground">Choisir un état des lieux d&apos;entrée</span>}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
                     {availableEntryInspections.length === 0
-                      ? <SelectItem value="_none" disabled>Aucun etat des lieux finalise pour ce bien</SelectItem>
+                      ? <SelectItem value="_none" disabled>Aucun état des lieux finalisé pour ce bien</SelectItem>
                       : availableEntryInspections.map(d => <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -464,20 +489,24 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <TF
-            label="Surface (m2)"
-            value={surface}
-            onChange={setSurface}
-            type="number"
-            placeholder="45"
-          />
-          <TF
-            label="Nombre de pieces"
-            value={roomsCount}
-            onChange={setRoomsCount}
-            type="number"
-            placeholder="3"
-          />
+          <LF label="Surface (m²)">
+            <Input
+              type="number"
+              value={surface}
+              onChange={e => setSurface(e.target.value)}
+              placeholder="45"
+              className="text-sm"
+            />
+          </LF>
+          <LF label="Nombre de pièces">
+            <Input
+              type="number"
+              value={roomsCount}
+              onChange={e => setRoomsCount(e.target.value)}
+              placeholder="3"
+              className="text-sm"
+            />
+          </LF>
         </div>
       </div>
     )
@@ -487,12 +516,12 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
 
   const renderAccessSection = () => (
     <div className="space-y-3">
-      <p className="text-sm font-medium text-slate-700">Moyens d acces et cles</p>
+      <p className="text-sm font-medium text-slate-700">Moyens d&apos;accès et clés</p>
       <div className="space-y-2">
         <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-500 px-1">
           <span className="col-span-4">Type</span>
           <span className="col-span-5">Destination</span>
-          <span className="col-span-2 text-center">Qte</span>
+          <span className="col-span-2 text-center">Qté</span>
           <span className="col-span-1" />
         </div>
         {ic.access_keys.map((key, i) => (
@@ -501,7 +530,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
               value={key.key_type}
               onChange={e => { const ks = [...ic.access_keys]; ks[i] = { ...ks[i], key_type: e.target.value }; setField('access_keys', ks) }}
             />
-            <Input className="col-span-5 text-sm" placeholder="Entree immeuble"
+            <Input className="col-span-5 text-sm" placeholder="Entrée immeuble"
               value={key.destination}
               onChange={e => { const ks = [...ic.access_keys]; ks[i] = { ...ks[i], destination: e.target.value }; setField('access_keys', ks) }}
             />
@@ -518,7 +547,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
       </div>
       <Button type="button" variant="outline" size="sm"
         onClick={() => setField('access_keys', [...ic.access_keys, { key_type: '', destination: '', quantity: 1 }])}>
-        <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un moyen d acces
+        <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un moyen d&apos;accès
       </Button>
     </div>
   )
@@ -527,11 +556,11 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
 
   const renderAccessoriesSection = () => (
     <div className="space-y-3">
-      <p className="text-sm font-medium text-slate-700">Accessoires et equipements</p>
+      <p className="text-sm font-medium text-slate-700">Accessoires et équipements</p>
       <div className="space-y-2">
         <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-500 px-1">
           <span className="col-span-7">Accessoire</span>
-          <span className="col-span-4">Etat</span>
+          <span className="col-span-4">État</span>
           <span className="col-span-1" />
         </div>
         {ic.accessories.map((acc, i) => (
@@ -569,30 +598,67 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
     <div className="space-y-5">
       <div className="space-y-3">
         <p className="text-sm font-medium text-slate-700">Chauffage</p>
-        <div className="grid grid-cols-2 gap-3">
-          <TF label="Type de chauffage" value={ic.heating.type} placeholder="chaudiere individuelle gaz"
-            onChange={v => setField('heating', { ...ic.heating, type: v })} />
-          <TF label="Localisation" value={ic.heating.location} placeholder="cuisine"
-            onChange={v => setField('heating', { ...ic.heating, location: v })} />
-          <TF label="Etat general" value={ic.heating.general_condition} placeholder="neuf"
-            onChange={v => setField('heating', { ...ic.heating, general_condition: v })} />
-          <TF label="Nombre de radiateurs" value={String(ic.heating.radiator_count)} type="number"
-            onChange={v => setField('heating', { ...ic.heating, radiator_count: parseInt(v) || 0 })} />
-          <div className="col-span-2">
-            <TF label="Etat des radiateurs" value={ic.heating.radiator_condition} placeholder="bon etat"
-              onChange={v => setField('heating', { ...ic.heating, radiator_condition: v })} />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-500">Type de chauffage</label>
+            <Input
+              value={ic.heating.type}
+              placeholder="Chaudière individuelle gaz"
+              onChange={e => setField('heating', { ...ic.heating, type: e.target.value })}
+              className="text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-500">Localisation</label>
+            <Input
+              value={ic.heating.location}
+              placeholder="Cuisine"
+              onChange={e => setField('heating', { ...ic.heating, location: e.target.value })}
+              className="text-sm"
+            />
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-500">État général</label>
+            <Input
+              value={ic.heating.general_condition}
+              placeholder="Neuf"
+              onChange={e => setField('heating', { ...ic.heating, general_condition: e.target.value })}
+              className="text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-500">Nombre de radiateurs</label>
+            <Input
+              type="number"
+              value={String(ic.heating.radiator_count)}
+              onChange={e => setField('heating', { ...ic.heating, radiator_count: parseInt(e.target.value) || 0 })}
+              className="text-sm"
+            />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-slate-500">État des radiateurs</label>
+          <Input
+            value={ic.heating.radiator_condition}
+            placeholder="Bon état"
+            onChange={e => setField('heating', { ...ic.heating, radiator_condition: e.target.value })}
+            className="text-sm"
+          />
+        </div>
       </div>
+
       <Separator />
+
       <div className="space-y-3">
         <p className="text-sm font-medium text-slate-700">Compteurs</p>
         <div className="space-y-2">
           <div className="grid grid-cols-12 gap-1.5 text-xs font-medium text-slate-500 px-1">
-            <span className="col-span-2">Energie</span>
+            <span className="col-span-2">Énergie</span>
             <span className="col-span-2">Fournisseur</span>
             <span className="col-span-3">Localisation</span>
-            <span className="col-span-2">Releve</span>
+            <span className="col-span-2">Relevé</span>
             <span className="col-span-2">Date</span>
             <span className="col-span-1" />
           </div>
@@ -644,9 +710,9 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
 
         <div className="space-y-2">
           <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-500 px-1">
-            <span className="col-span-3">Element</span>
+            <span className="col-span-3">Élément</span>
             <span className="col-span-3">Description</span>
-            <span className="col-span-2">Etat</span>
+            <span className="col-span-2">État</span>
             <span className="col-span-3">Commentaire</span>
             <span className="col-span-1" />
           </div>
@@ -654,7 +720,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
             <div key={j} className="grid grid-cols-12 gap-2 items-center">
               <Input className="col-span-3 text-xs" value={el.name}
                 onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], name: e.target.value }; return { ...r, elements: els } })} />
-              <Input className="col-span-3 text-xs" placeholder="..."
+              <Input className="col-span-3 text-xs" placeholder="…"
                 value={el.description}
                 onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], description: e.target.value }; return { ...r, elements: els } })} />
               <div className="col-span-2">
@@ -664,7 +730,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
                   <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <Input className="col-span-3 text-xs" placeholder="..."
+              <Input className="col-span-3 text-xs" placeholder="…"
                 value={el.comment}
                 onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], comment: e.target.value }; return { ...r, elements: els } })} />
               <Button type="button" variant="ghost" size="icon" className="col-span-1 h-7 w-7 text-red-400"
@@ -677,10 +743,10 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
 
         <Button type="button" variant="outline" size="sm"
           onClick={() => updateRoom(idx, r => ({ ...r, elements: [...r.elements, { name: '', description: '', condition: 'A' as InspectionCondition, comment: '' }] }))}>
-          <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un element
+          <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un élément
         </Button>
 
-        <LF label="Observations de la piece">
+        <LF label="Observations de la pièce">
           <Textarea value={room.remarks} rows={2} className="text-sm resize-none"
             onChange={e => updateRoom(idx, r => ({ ...r, remarks: e.target.value }))} />
         </LF>
@@ -689,7 +755,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
           <>
             <Separator />
             <Button type="button" variant="outline" size="sm" onClick={addRoom}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter une piece
+              <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter une pièce
             </Button>
           </>
         )}
@@ -719,8 +785,8 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
         <div className="space-y-2">
           <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-500 px-1">
             <span className="col-span-4">Objet</span>
-            <span className="col-span-1">Qte</span>
-            <span className="col-span-3">Etat</span>
+            <span className="col-span-1">Qté</span>
+            <span className="col-span-3">État</span>
             <span className="col-span-3">Commentaire</span>
             <span className="col-span-1" />
           </div>
@@ -737,7 +803,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
                   <SelectContent>{INV_CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <Input className="col-span-3 text-xs" placeholder="..." value={item.comment}
+              <Input className="col-span-3 text-xs" placeholder="…" value={item.comment}
                 onChange={e => updateRoom(idx, r => { const items = [...r.items]; items[j] = { ...items[j], comment: e.target.value }; return { ...r, items } })} />
               <Button type="button" variant="ghost" size="icon" className="col-span-1 h-7 w-7 text-red-400"
                 onClick={() => updateRoom(idx, r => ({ ...r, items: r.items.filter((_: any, k: number) => k !== j) }))}>
@@ -756,7 +822,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
           <>
             <Separator />
             <Button type="button" variant="outline" size="sm" onClick={addRoom}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter une piece
+              <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter une pièce
             </Button>
           </>
         )}
@@ -764,79 +830,148 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
     )
   }
 
-  // ─── Last section — Observations et signatures ────────────────────────────
+  // ─── Observations section (penultimate) ───────────────────────────────────
 
   const renderObservationsSection = () => (
     <div className="space-y-5">
-      <LF label="Observations generales">
-        <Textarea value={content.general_observations} rows={4} className="text-sm resize-none"
-          onChange={e => setField('general_observations', e.target.value)} />
+      <LF label="Observations générales">
+        <Textarea
+          value={content.general_observations}
+          rows={5}
+          className="text-sm resize-none"
+          placeholder="Remarques générales sur l'état du logement…"
+          onChange={e => setField('general_observations', e.target.value)}
+        />
       </LF>
 
       {!isInventory && (
         <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500 leading-relaxed">
-          Le present etat des lieux etabli contradictoirement entre les parties qui le reconnaissent,
-          fait partie integrante du contrat de location dont il ne peut etre dissocie.
+          Le présent état des lieux établi contradictoirement entre les parties qui le reconnaissent,
+          fait partie intégrante du contrat de location dont il ne peut être dissocié.
+        </div>
+      )}
+    </div>
+  )
+
+  // ─── Signatures section (last) — identical to bail flow ───────────────────
+
+  const renderSignaturesSection = () => (
+    <div className="space-y-4">
+      {/* Mini step indicator */}
+      <div className="flex items-center gap-1 mb-2">
+        {(['sign', 'send'] as const).map((step, i) => {
+          const labels = { sign: 'Signature', send: 'Envoi' }
+          const done   = sigSubStep === 'send' && step === 'sign'
+          const active = sigSubStep === step
+          return (
+            <div key={step} className="flex items-center gap-1">
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                done   ? 'bg-emerald-100 text-emerald-700' :
+                active ? 'text-white' : 'bg-slate-100 text-slate-400'
+              }`} style={active ? { backgroundColor: '#063B26' } : {}}>
+                {done
+                  ? <CheckCircle2 className="h-3.5 w-3.5" />
+                  : <span className="h-4 w-4 flex items-center justify-center rounded-full border text-[10px] border-current">{i + 1}</span>
+                }
+                {labels[step]}
+              </div>
+              {i === 0 && (
+                <div className={`h-px w-4 ${done ? 'bg-emerald-300' : 'bg-slate-200'}`} />
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Step: Signature bailleur ── */}
+      {sigSubStep === 'sign' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-slate-700">Signature du bailleur</h3>
+            {ownerSig && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
+          </div>
+
+          {ownerSig ? (
+            <>
+              <div className="border border-emerald-200 rounded-lg p-2 bg-emerald-50">
+                <img src={ownerSig} alt="Signature bailleur" className="h-16 object-contain" />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setOwnerSig(null)}>
+                  Modifier la signature
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setSigSubStep('send')}
+                  className="text-[#063B26] font-semibold"
+                  style={{ backgroundColor: '#CFFF92' }}
+                >
+                  Continuer →
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="border border-slate-200 rounded-lg p-3">
+              <p className="text-xs text-slate-500 mb-2">Signez dans le cadre ci-dessous</p>
+              <SignatureCanvas
+                onSave={(sig) => { setOwnerSig(sig); setSigSubStep('send') }}
+                existingSignature={ownerSig}
+              />
+            </div>
+          )}
         </div>
       )}
 
-      <Separator />
+      {/* ── Step: Envoi au(x) locataire(s) ── */}
+      {sigSubStep === 'send' && (
+        <div className="space-y-4">
+          <h3 className="font-semibold text-slate-700">Envoi au locataire</h3>
 
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium text-slate-700">Signature du bailleur</p>
-          {ownerSig && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
-        </div>
-
-        {ownerSig ? (
-          <div className="space-y-2">
-            <div className="border border-emerald-200 rounded-lg p-2 bg-emerald-50">
-              <img src={ownerSig} alt="Signature bailleur" className="h-14 object-contain" />
+          {ownerSig && (
+            <div className="border border-emerald-200 rounded-lg p-2 bg-emerald-50 mb-2">
+              <p className="text-xs text-slate-500 mb-1">Signature enregistrée</p>
+              <img src={ownerSig} alt="Signature bailleur" className="h-12 object-contain" />
             </div>
-            <button
-              type="button"
-              onClick={() => setOwnerSig(null)}
-              className="text-xs text-slate-400 hover:text-slate-600 underline"
-            >
-              Modifier la signature
-            </button>
-          </div>
-        ) : (
-          <div className="border border-slate-200 rounded-lg p-3">
-            <p className="text-xs text-slate-500 mb-2">Signez dans le cadre ci-dessous</p>
-            <SignatureCanvas onSave={setOwnerSig} existingSignature={ownerSig} />
-          </div>
-        )}
-      </div>
+          )}
 
-      {ownerSig && (
-        <>
-          <Separator />
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700">Signature du locataire</p>
-            <p className="text-xs text-slate-500">
-              Envoyez un lien de signature au locataire par email, ou generez directement le PDF sans signature locataire.
-            </p>
+          <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-600">
+            Votre document est signé. Envoyez le lien de signature au locataire, ou générez le PDF directement.
+          </div>
+
+          <div className="flex flex-col gap-2">
             <Button
-              type="button"
-              size="sm"
               onClick={handleSendSigningLink}
-              disabled={!tenantId || sigSending || saving}
-              className="w-full text-white font-semibold"
-              style={{ backgroundColor: '#063B26' }}
+              disabled={tenantIds.length === 0 || sigSending || saving}
+              className="w-full text-[#063B26] font-semibold"
+              style={{ backgroundColor: '#CFFF92' }}
             >
               {sigSending
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
-                : <Send className="h-3.5 w-3.5 mr-2" />}
-              Envoyer le lien de signature au locataire
+                ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                : <Send className="h-4 w-4 mr-2" />}
+              Envoyer le lien de signature
             </Button>
-            {!tenantId && (
-              <p className="text-xs text-amber-500">
-                Selectionner un locataire a l etape 1 pour activer cette option
-              </p>
+            {tenantIds.length === 0 && (
+              <p className="text-xs text-amber-600">Sélectionnez un locataire à l&apos;étape 1 pour activer cette option.</p>
             )}
+            <Button
+              variant="outline"
+              onClick={handleGenerate}
+              disabled={!propertyId || generating || saving}
+              className="w-full"
+            >
+              {generating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Générer le PDF sans signature locataire
+            </Button>
           </div>
-        </>
+
+          <button
+            type="button"
+            onClick={() => setSigSubStep('sign')}
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" /> Retour à la signature
+          </button>
+        </div>
       )}
     </div>
   )
@@ -846,14 +981,16 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const renderSection = () => {
     if (sectionIndex === 0) return renderInfoSection()
     if (isInventory) {
-      if (isRoomSec) return renderInventoryRoomSection(roomIdx)
-      return renderObservationsSection()
+      if (isRoomSec)  return renderInventoryRoomSection(roomIdx)
+      if (isObsSec)   return renderObservationsSection()
+      return renderSignaturesSection()
     }
     if (sectionIndex === 1) return renderAccessSection()
     if (sectionIndex === 2) return renderAccessoriesSection()
     if (sectionIndex === 3) return renderHeatingMetersSection()
-    if (isRoomSec) return renderInspectionRoomSection(roomIdx)
-    return renderObservationsSection()
+    if (isRoomSec)  return renderInspectionRoomSection(roomIdx)
+    if (isObsSec)   return renderObservationsSection()
+    return renderSignaturesSection()
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -871,9 +1008,15 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Button type="button" variant="outline" size="sm"
-            onClick={() => setSectionIndex(i => Math.max(0, i - 1))}
-            disabled={sectionIndex === 0}>
-            <ChevronLeft className="h-4 w-4 mr-1" /> Precedent
+            onClick={() => {
+              if (isSigSec && sigSubStep === 'send') {
+                setSigSubStep('sign')
+              } else {
+                setSectionIndex(i => Math.max(0, i - 1))
+              }
+            }}
+            disabled={sectionIndex === 0 && sigSubStep === 'sign'}>
+            <ChevronLeft className="h-4 w-4 mr-1" /> Précédent
           </Button>
           {!isLastSec && (
             <Button type="button" size="sm"
@@ -891,16 +1034,6 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
             Brouillon
           </Button>
-          {isLastSec && (
-            <Button type="button" size="sm"
-              onClick={handleGenerate}
-              disabled={!propertyId || saving || generating}
-              className="text-[#063B26] font-semibold"
-              style={{ backgroundColor: '#CFFF92' }}>
-              {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
-              Generer le PDF
-            </Button>
-          )}
         </div>
       </div>
     </div>
