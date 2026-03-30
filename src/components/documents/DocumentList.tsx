@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import DocumentForm from './DocumentForm'
 import DocumentDetail from './DocumentDetail'
+import InspectionWizard from './InspectionWizard'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
@@ -42,6 +43,9 @@ export default function DocumentList({ documents, properties, tenants, userId }:
   const [openForm, setOpenForm] = useState(false)
   const [openDetail, setOpenDetail] = useState<any>(null)
   const [openLeaseCreation, setOpenLeaseCreation] = useState(false)
+  const [openInspectionCreation, setOpenInspectionCreation] = useState<{
+    type: 'entry_inspection' | 'exit_inspection' | 'inventory'
+  } | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [generating, setGenerating] = useState<string | null>(null)
   const router = useRouter()
@@ -184,7 +188,17 @@ export default function DocumentList({ documents, properties, tenants, userId }:
             properties={properties}
             tenants={tenants}
             userId={userId}
-            onSuccess={(doc) => { setOpenForm(false); router.refresh(); if (doc) setOpenDetail(doc); else setOpenLeaseCreation(true) }}
+            onSuccess={(doc) => {
+              setOpenForm(false)
+              if (!doc) {
+                setOpenLeaseCreation(true)
+              } else if (doc._wizardType) {
+                setOpenInspectionCreation({ type: doc._wizardType })
+              } else {
+                router.refresh()
+                setOpenDetail(doc)
+              }
+            }}
           />
         </DialogContent>
       </Dialog>
@@ -218,6 +232,27 @@ export default function DocumentList({ documents, properties, tenants, userId }:
               properties={properties}
               tenants={tenants}
               userId={userId}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {openInspectionCreation && (
+        <Dialog
+          open={!!openInspectionCreation}
+          onOpenChange={v => { if (!v) { setOpenInspectionCreation(null); router.refresh() } }}
+        >
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{typeLabels[openInspectionCreation.type as keyof typeof typeLabels]}</DialogTitle>
+            </DialogHeader>
+            <InspectionWizard
+              type={openInspectionCreation.type}
+              properties={properties}
+              tenants={tenants}
+              userId={userId}
+              allDocuments={documents}
+              onClose={() => { setOpenInspectionCreation(null); router.refresh() }}
             />
           </DialogContent>
         </Dialog>

@@ -260,17 +260,19 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
         </Select>
       </div>
 
-      {docType === 'lease' ? (
+      {['lease', 'entry_inspection', 'exit_inspection', 'inventory'].includes(docType) ? (
         <div className="py-3 space-y-3">
           <p className="text-sm text-slate-500">
-            Le bail sera configuré étape par étape via un assistant dédié.
+            {docType === 'lease'
+              ? 'Le bail sera configuré étape par étape via un assistant dédié.'
+              : 'Ce document sera configuré étape par étape via un assistant dédié.'}
           </p>
           <Button
-            onClick={() => onSuccess()}
+            onClick={() => docType === 'lease' ? onSuccess() : onSuccess({ _wizardType: docType })}
             className="w-full text-[#063B26] font-semibold"
             style={{ backgroundColor: '#CFFF92' }}
           >
-            Créer un contrat de bail
+            {docType === 'lease' ? 'Créer un contrat de bail' : `Ouvrir l'assistant — ${typeLabels[docType]}`}
           </Button>
         </div>
       ) : (
