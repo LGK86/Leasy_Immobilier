@@ -293,7 +293,9 @@ async function generateLeasePDF(data: DocumentData): Promise<Uint8Array> {
 
   subSection('Loyer')
   field('Loyer mensuel hors charges', rentAmt ? `${fmtAmt(rentAmt)} EUR` : '_____ EUR')
-  field('Soumis au decret d encadrement des loyers', 'NON')
+  checkY(16)
+  page.drawText(sa(`Soumis au decret d encadrement des loyers : NON`), { x: M, y, size: 9, font: HLVB, color: COL_MID })
+  y -= 14
   y -= 4
 
   subSection('Charges recuperables')
