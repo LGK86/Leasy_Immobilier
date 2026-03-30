@@ -161,9 +161,39 @@ export function createDefaultInspectionContent(
 // ---------------------------------------------------------------------------
 
 export const DEFAULT_INVENTORY_ROOMS: InventoryRoom[] = [
-  { id: 'room_1', name: 'Sejour / Salle a manger', order: 1, items: [] },
-  { id: 'room_2', name: 'Cuisine',                  order: 2, items: [] },
-  { id: 'room_3', name: 'Chambre',                  order: 3, items: [] },
+  {
+    id: 'room_1',
+    name: 'Sejour / Salle a manger',
+    order: 1,
+    items: [
+      { name: 'Canape',       quantity: 1, condition: 'Bon', comment: '' },
+      { name: 'Table a manger', quantity: 1, condition: 'Bon', comment: '' },
+      { name: 'Chaises',      quantity: 4, condition: 'Bon', comment: '' },
+      { name: 'Television',   quantity: 1, condition: 'Bon', comment: '' },
+    ],
+  },
+  {
+    id: 'room_2',
+    name: 'Cuisine',
+    order: 2,
+    items: [
+      { name: 'Refrigerateur',      quantity: 1, condition: 'Bon', comment: '' },
+      { name: 'Four',               quantity: 1, condition: 'Bon', comment: '' },
+      { name: 'Plaques de cuisson', quantity: 1, condition: 'Bon', comment: '' },
+      { name: 'Vaisselle',          quantity: 6, condition: 'Bon', comment: '' },
+    ],
+  },
+  {
+    id: 'room_3',
+    name: 'Chambre',
+    order: 3,
+    items: [
+      { name: 'Lit',             quantity: 1, condition: 'Bon', comment: '' },
+      { name: 'Matelas',         quantity: 1, condition: 'Bon', comment: '' },
+      { name: 'Armoire',         quantity: 1, condition: 'Bon', comment: '' },
+      { name: 'Table de chevet', quantity: 1, condition: 'Bon', comment: '' },
+    ],
+  },
 ]
 
 // ---------------------------------------------------------------------------
@@ -174,7 +204,7 @@ export function createDefaultInventoryContent(): InventoryContent {
   return {
     inventory_date: '',
     linked_inspection_id: null,
-    rooms: DEFAULT_INVENTORY_ROOMS.map((room) => ({ ...room, items: [] })),
+    rooms: DEFAULT_INVENTORY_ROOMS.map((room) => ({ ...room, items: room.items.map((item) => ({ ...item })) })),
     general_observations: '',
     location: '',
     copies_count: 2,

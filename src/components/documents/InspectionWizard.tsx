@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Plus, Trash2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { Plus, Trash2, ChevronLeft, ChevronRight, Loader2, Send, CheckCircle2 } from 'lucide-react'
 import SignatureCanvas from './SignatureCanvas'
 import type {
   InspectionContent, InventoryContent,
@@ -120,16 +120,18 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const supabase = createClient()
   const isInventory = type === 'inventory'
 
-  const [savedDocId,   setSavedDocId]   = useState<string | null>(null)
-  const [saving,       setSaving]       = useState(false)
-  const [generating,   setGenerating]   = useState(false)
-  const [propertyId,   setPropertyId]   = useState('')
-  const [tenantId,     setTenantId]     = useState('')
-  const [surface,      setSurface]      = useState('')
-  const [roomsCount,   setRoomsCount]   = useState('')
-  const [sectionIndex, setSectionIndex] = useState(0)
-  const [ownerSig,     setOwnerSig]     = useState<string | null>(null)
-  const [tenantSig,    setTenantSig]    = useState<string | null>(null)
+  const [savedDocId,          setSavedDocId]          = useState<string | null>(null)
+  const [saving,              setSaving]              = useState(false)
+  const [generating,          setGenerating]          = useState(false)
+  const [sigSending,          setSigSending]          = useState(false)
+  const [propertyId,          setPropertyId]          = useState('')
+  const [tenantId,            setTenantId]            = useState('')
+  const [surface,             setSurface]             = useState('')
+  const [roomsCount,          setRoomsCount]          = useState('')
+  const [sectionIndex,        setSectionIndex]        = useState(0)
+  const [ownerSig,            setOwnerSig]            = useState<string | null>(null)
+  const [linkEntryInspection, setLinkEntryInspection] = useState(false)
+  const [linkedEntryId,       setLinkedEntryId]       = useState('')
 
   const [content, setContent] = useState<InspectionContent | InventoryContent>(() =>
     isInventory
@@ -151,6 +153,9 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
 
   const entryInspections = allDocuments.filter(
     d => d.type === 'entry_inspection' && d.property_id === propertyId
+  )
+  const availableEntryInspections = allDocuments.filter(
+    d => d.type === 'entry_inspection' && d.property_id === propertyId && d.status !== 'draft'
   )
 
   // ── Property selection with auto-fill ────────────────────────
@@ -217,7 +222,6 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
       title,
       content:         contentWithMeta,
       owner_signature:  ownerSig,
-      tenant_signature: tenantSig,
       status,
       updated_at: new Date().toISOString(),
     }
@@ -270,6 +274,35 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
       toast.error('Erreur lors de la generation')
     }
     setGenerating(false)
+  }
+
+  const handleSendSigningLink = async () => {
+    if (!propertyId) { toast.error('Veuillez selectionner un bien'); return }
+    if (!tenantId)   { toast.error('Veuillez selectionner un locataire'); return }
+    setSigSending(true)
+    const id = await persistDraft()
+    if (!id) { setSigSending(false); return }
+    await supabase.from('documents').update({
+      owner_signature: ownerSig,
+      status: 'signed',
+      updated_at: new Date().toISOString(),
+    }).eq('id', id)
+    try {
+      const res = await fetch('/api/documents/send-signing-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentId: id }),
+      })
+      if (res.ok) {
+        toast.success('Lien de signature envoye au locataire')
+        onClose()
+      } else {
+        toast.error("Erreur lors de l envoi")
+      }
+    } catch {
+      toast.error("Erreur lors de l envoi")
+    }
+    setSigSending(false)
   }
 
   // ─── Section 0 — Informations générales ───────────────────────────────────
@@ -368,6 +401,68 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
           </LF>
         )}
 
+        {type === 'exit_inspection' && (
+          <div className="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="link_entry_inspection"
+                checked={linkEntryInspection}
+                onChange={e => {
+                  setLinkEntryInspection(e.target.checked)
+                  if (!e.target.checked) {
+                    setLinkedEntryId('')
+                    setField('linked_inspection_id', null)
+                  }
+                }}
+                className="h-4 w-4 accent-[#063B26]"
+              />
+              <label htmlFor="link_entry_inspection" className="text-sm text-slate-700 cursor-pointer">
+                Cloturer un etat des lieux d entree existant ?
+              </label>
+            </div>
+            {linkEntryInspection && (
+              <LF label="Selectionner l etat des lieux d entree">
+                <Select
+                  value={linkedEntryId || undefined}
+                  onValueChange={(v: string | null) => {
+                    const id = v ?? ''
+                    setLinkedEntryId(id)
+                    setField('linked_inspection_id', id || null)
+                    if (id) {
+                      const entryDoc = allDocuments.find(d => d.id === id)
+                      if (entryDoc?.content) {
+                        const ec = entryDoc.content as InspectionContent
+                        setContent(prev => ({
+                          ...prev,
+                          rooms:       JSON.parse(JSON.stringify(ec.rooms       ?? [])),
+                          accessories: JSON.parse(JSON.stringify(ec.accessories ?? [])),
+                          heating:     { ...ec.heating },
+                          meters:      JSON.parse(JSON.stringify(ec.meters      ?? [])),
+                          access_keys: JSON.parse(JSON.stringify(ec.access_keys ?? [])),
+                        } as InspectionContent))
+                      }
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <span className="flex-1 text-left truncate text-sm">
+                      {linkedEntryId
+                        ? availableEntryInspections.find(d => d.id === linkedEntryId)?.title ?? 'Selectionne'
+                        : <span className="text-muted-foreground">Choisir un etat des lieux d entree</span>}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableEntryInspections.length === 0
+                      ? <SelectItem value="_none" disabled>Aucun etat des lieux finalise pour ce bien</SelectItem>
+                      : availableEntryInspections.map(d => <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </LF>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           <TF
             label="Surface (m2)"
@@ -384,13 +479,6 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
             placeholder="3"
           />
         </div>
-
-        <TF
-          label="Lieu de signature"
-          value={content.location}
-          onChange={v => setField('location', v)}
-          placeholder="Paris"
-        />
       </div>
     )
   }
@@ -685,34 +773,71 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
           onChange={e => setField('general_observations', e.target.value)} />
       </LF>
 
-      <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500 leading-relaxed">
-        Le present etat des lieux etabli contradictoirement entre les parties qui le reconnaissent,
-        fait partie integrante du contrat de location dont il ne peut etre dissocie.
-      </div>
+      {!isInventory && (
+        <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500 leading-relaxed">
+          Le present etat des lieux etabli contradictoirement entre les parties qui le reconnaissent,
+          fait partie integrante du contrat de location dont il ne peut etre dissocie.
+        </div>
+      )}
 
       <Separator />
 
       <div className="space-y-2">
-        <p className="text-sm font-medium text-slate-700">Signature du bailleur</p>
-        {ownerSig && (
-          <div className="border border-emerald-200 rounded-lg p-2 bg-emerald-50">
-            <img src={ownerSig} alt="Signature bailleur" className="h-14 object-contain" />
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-slate-700">Signature du bailleur</p>
+          {ownerSig && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+        </div>
+
+        {ownerSig ? (
+          <div className="space-y-2">
+            <div className="border border-emerald-200 rounded-lg p-2 bg-emerald-50">
+              <img src={ownerSig} alt="Signature bailleur" className="h-14 object-contain" />
+            </div>
+            <button
+              type="button"
+              onClick={() => setOwnerSig(null)}
+              className="text-xs text-slate-400 hover:text-slate-600 underline"
+            >
+              Modifier la signature
+            </button>
+          </div>
+        ) : (
+          <div className="border border-slate-200 rounded-lg p-3">
+            <p className="text-xs text-slate-500 mb-2">Signez dans le cadre ci-dessous</p>
+            <SignatureCanvas onSave={setOwnerSig} existingSignature={ownerSig} />
           </div>
         )}
-        <SignatureCanvas onSave={setOwnerSig} existingSignature={ownerSig} />
       </div>
 
-      <Separator />
-
-      <div className="space-y-2">
-        <p className="text-sm font-medium text-slate-700">Signature du locataire</p>
-        {tenantSig && (
-          <div className="border border-emerald-200 rounded-lg p-2 bg-emerald-50">
-            <img src={tenantSig} alt="Signature locataire" className="h-14 object-contain" />
+      {ownerSig && (
+        <>
+          <Separator />
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-slate-700">Signature du locataire</p>
+            <p className="text-xs text-slate-500">
+              Envoyez un lien de signature au locataire par email, ou generez directement le PDF sans signature locataire.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSendSigningLink}
+              disabled={!tenantId || sigSending || saving}
+              className="w-full text-white font-semibold"
+              style={{ backgroundColor: '#063B26' }}
+            >
+              {sigSending
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+                : <Send className="h-3.5 w-3.5 mr-2" />}
+              Envoyer le lien de signature au locataire
+            </Button>
+            {!tenantId && (
+              <p className="text-xs text-amber-500">
+                Selectionner un locataire a l etape 1 pour activer cette option
+              </p>
+            )}
           </div>
-        )}
-        <SignatureCanvas onSave={setTenantSig} existingSignature={tenantSig} />
-      </div>
+        </>
+      )}
     </div>
   )
 

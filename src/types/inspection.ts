@@ -68,6 +68,7 @@ export interface InspectionContent {
   general_observations: string
   location: string
   copies_count: number
+  linked_inspection_id?: string | null
 }
 
 // --- Inventaire ---

@@ -272,7 +272,10 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
             className="w-full text-[#063B26] font-semibold"
             style={{ backgroundColor: '#CFFF92' }}
           >
-            {docType === 'lease' ? 'Créer un contrat de bail' : `Ouvrir l'assistant — ${typeLabels[docType]}`}
+            {docType === 'lease' ? "Créer un contrat de bail" :
+             docType === 'entry_inspection' ? "Créer un État des lieux d'entrée" :
+             docType === 'exit_inspection' ? "Créer un État des lieux de sortie" :
+             "Créer un Inventaire du mobilier"}
           </Button>
         </div>
       ) : (
