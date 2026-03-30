@@ -1,0 +1,93 @@
+-- Migration: État des lieux & Inventaire
+-- Date: 2026-03-30
+--
+-- La contrainte sur documents.type couvre déjà :
+--   'lease', 'entry_inspection', 'exit_inspection', 'inventory'
+-- Aucune modification de contrainte nécessaire.
+--
+-- Ce fichier documente la structure JSONB attendue dans documents.content
+-- selon le type de document. Aucune colonne supplémentaire n'est créée :
+-- le champ content (jsonb) existant est suffisant.
+
+-- Structure JSONB pour entry_inspection / exit_inspection :
+-- {
+--   "type": "entry" | "exit",
+--   "inspection_date": "YYYY-MM-DD",
+--   "description": "",
+--   "access_keys": [
+--     { "key_type": "Badge", "destination": "Entree immeuble", "quantity": 2 }
+--   ],
+--   "accessories": [
+--     { "name": "Sonnette", "condition": "A" }
+--   ],
+--   "heating": {
+--     "type": "chaudiere individuelle au gaz",
+--     "location": "cuisine",
+--     "general_condition": "neuf",
+--     "radiator_count": 4,
+--     "radiator_condition": "neuf"
+--   },
+--   "meters": [
+--     {
+--       "energy_type": "Electricite",
+--       "provider": "EDF",
+--       "location": "colonne gauche cuisine",
+--       "reading": "",
+--       "reading_date": ""
+--     }
+--   ],
+--   "rooms": [
+--     {
+--       "id": "room_1",
+--       "name": "Entree / Couloir",
+--       "order": 1,
+--       "elements": [
+--         {
+--           "name": "Porte(s)",
+--           "description": "1 porte blindee verte",
+--           "condition": "A",
+--           "comment": ""
+--         }
+--       ],
+--       "remarks": ""
+--     }
+--   ],
+--   "general_observations": "",
+--   "location": "Paris",
+--   "copies_count": 2
+-- }
+
+-- Structure JSONB pour inventory :
+-- {
+--   "inventory_date": "YYYY-MM-DD",
+--   "linked_inspection_id": "uuid",
+--   "rooms": [
+--     {
+--       "id": "room_1",
+--       "name": "Sejour / Salle a manger",
+--       "order": 1,
+--       "items": [
+--         {
+--           "name": "Table a manger",
+--           "quantity": 1,
+--           "condition": "Neuf",
+--           "comment": ""
+--         }
+--       ]
+--     }
+--   ],
+--   "general_observations": "",
+--   "location": "Paris",
+--   "copies_count": 2
+-- }
+
+-- Valeurs valides pour InspectionCondition (loi ALUR) :
+--   'A' = Tres bon etat / Neuf
+--   'B' = Bon etat
+--   'C' = Etat d'usage
+--   'D' = Mauvais etat
+--   'HS' = Hors service
+--   'NV' = Non verifie
+
+-- Valeurs valides pour InventoryCondition :
+--   'Neuf', 'Bon', 'Moyen', 'Tres abime'
