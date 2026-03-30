@@ -788,31 +788,29 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
         </div>
 
         <div className="space-y-2">
-          <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-500 px-1">
-            <span className="col-span-3">Élément</span>
-            <span className="col-span-3">Description</span>
-            <span className="col-span-2">État</span>
-            <span className="col-span-3">Commentaire</span>
-            <span className="col-span-1" />
+          <div className="grid gap-2 text-xs font-medium text-slate-500 px-1" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5% auto' }}>
+            <span>Élément</span>
+            <span>État</span>
+            <span>Description</span>
+            <span>Commentaire</span>
+            <span />
           </div>
           {room.elements.map((el: any, j: number) => (
-            <div key={j} className="grid grid-cols-12 gap-2 items-center">
-              <Input className="col-span-3 text-xs" value={el.name}
+            <div key={j} className="grid gap-2 items-center" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5% auto' }}>
+              <Input className="text-xs" value={el.name}
                 onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], name: e.target.value }; return { ...r, elements: els } })} />
-              <Input className="col-span-3 text-xs" placeholder="…"
+              <Select value={el.condition}
+                onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
+                <SelectTrigger className="w-full h-8"><span className="text-xs">{el.condition}</span></SelectTrigger>
+                <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+              </Select>
+              <Input className="text-xs" placeholder="…"
                 value={el.description}
                 onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], description: e.target.value }; return { ...r, elements: els } })} />
-              <div className="col-span-2">
-                <Select value={el.condition}
-                  onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
-                  <SelectTrigger className="w-full h-8"><span className="text-xs">{el.condition}</span></SelectTrigger>
-                  <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <Input className="col-span-3 text-xs" placeholder="…"
+              <Input className="text-xs" placeholder="…"
                 value={el.comment}
                 onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], comment: e.target.value }; return { ...r, elements: els } })} />
-              <Button type="button" variant="ghost" size="icon" className="col-span-1 h-7 w-7 text-red-400"
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-400"
                 onClick={() => updateRoom(idx, r => ({ ...r, elements: r.elements.filter((_: any, k: number) => k !== j) }))}>
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -935,7 +933,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   // ─── Signatures section (last) — identical to bail flow ───────────────────
 
   const renderSignaturesSection = () => (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-[500px] mx-auto">
       {/* Mini step indicator */}
       <div className="flex items-center gap-1 mb-2">
         {(['sign', 'send'] as const).map((step, i) => {
@@ -990,7 +988,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
               </div>
             </>
           ) : (
-            <div className="border border-slate-200 rounded-lg p-3">
+            <div className="border border-slate-200 rounded-lg p-3 max-w-[400px] mx-auto">
               <p className="text-xs text-slate-500 mb-2">Signez dans le cadre ci-dessous</p>
               <SignatureCanvas
                 onSave={(sig) => { setOwnerSig(sig); setSigSubStep('send') }}
