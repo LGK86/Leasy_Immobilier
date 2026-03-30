@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Plus, Trash2, ChevronLeft, ChevronRight, Loader2, Send, CheckCircle2, X } from 'lucide-react'
+import { Plus, Trash2, ChevronLeft, ChevronRight, Loader2, Send, CheckCircle2, X, UserPlus } from 'lucide-react'
 import SignatureCanvas from './SignatureCanvas'
 import type {
   InspectionContent, InventoryContent,
@@ -126,6 +126,10 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const [ownerSig,            setOwnerSig]            = useState<string | null>(null)
   const [linkEntryInspection, setLinkEntryInspection] = useState(false)
   const [linkedEntryId,       setLinkedEntryId]       = useState('')
+  const [localTenants,        setLocalTenants]        = useState<Tenant[]>(tenants)
+  const [showNewTenant,       setShowNewTenant]       = useState(false)
+  const [newTenantForm,       setNewTenantForm]       = useState({ first_name: '', last_name: '', email: '', phone: '' })
+  const [creatingTenant,      setCreatingTenant]      = useState(false)
 
   const [content, setContent] = useState<InspectionContent | InventoryContent>(() =>
     isInventory
@@ -309,10 +313,41 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
     setSigSending(false)
   }
 
+  // ── Inline tenant creation ────────────────────────────────────
+  const handleCreateTenant = async () => {
+    if (!newTenantForm.first_name || !newTenantForm.last_name || !newTenantForm.email) return
+    setCreatingTenant(true)
+    const { data, error } = await supabase
+      .from('tenants')
+      .insert({
+        owner_id: userId,
+        first_name: newTenantForm.first_name,
+        last_name: newTenantForm.last_name,
+        email: newTenantForm.email,
+        phone: newTenantForm.phone || null,
+        property_id: propertyId || null,
+        status: 'draft',
+        updated_at: new Date().toISOString(),
+      })
+      .select('id, first_name, last_name, property_id, email')
+      .single()
+    if (!error && data) {
+      const entry: Tenant = { ...data, property_id: data.property_id ?? null }
+      setLocalTenants(prev => [...prev, entry])
+      addTenant(data.id)
+      setNewTenantForm({ first_name: '', last_name: '', email: '', phone: '' })
+      setShowNewTenant(false)
+      toast.success('Locataire créé et ajouté')
+    } else if (error) {
+      toast.error('Erreur : ' + error.message)
+    }
+    setCreatingTenant(false)
+  }
+
   // ─── Section 0 — Informations générales ───────────────────────────────────
 
   const renderInfoSection = () => {
-    const filteredTenants = tenants.filter(t => !propertyId || t.property_id === propertyId || t.property_id === null)
+    const filteredTenants = localTenants.filter(t => !propertyId || t.property_id === propertyId || t.property_id === null)
     const unselectedTenants = filteredTenants.filter(t => !tenantIds.includes(t.id))
     return (
       <div className="space-y-4">
@@ -344,12 +379,12 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
           {tenantIds.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {tenantIds.map(id => {
-                const t = filteredTenants.find(t => t.id === id)
+                const t = localTenants.find(t => t.id === id)
                 if (!t) return null
                 return (
-                  <div key={id} className="flex items-center gap-1 bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded-full">
+                  <div key={id} className="flex items-center gap-1.5 bg-slate-100 text-slate-700 text-sm px-3 py-1.5 rounded-full">
                     <span>{t.first_name} {t.last_name}</span>
-                    <button type="button" onClick={() => removeTenant(id)} className="text-slate-400 hover:text-red-500">
+                    <button type="button" onClick={() => removeTenant(id)} className="text-slate-400 hover:text-red-500 transition-colors">
                       <X className="h-3 w-3" />
                     </button>
                   </div>
@@ -359,18 +394,62 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
           )}
 
           {unselectedTenants.length > 0 && (
-            <Select onValueChange={(v: string | null) => { if (v) addTenant(v) }}>
-              <SelectTrigger className="w-full">
-                <span className="flex-1 text-left truncate text-sm text-muted-foreground">
-                  Ajouter un locataire…
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                {unselectedTenants.map(t => (
-                  <SelectItem key={t.id} value={t.id}>{t.first_name} {t.last_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <LF label="Ajouter un locataire existant">
+              <Select onValueChange={(v: string | null) => { if (v) addTenant(v) }}>
+                <SelectTrigger className="w-full">
+                  <span className="flex-1 text-left text-sm text-muted-foreground">Sélectionner un locataire</span>
+                </SelectTrigger>
+                <SelectContent>
+                  {unselectedTenants.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.first_name} {t.last_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </LF>
+          )}
+
+          {showNewTenant ? (
+            <div className="border border-slate-200 rounded-lg p-4 space-y-3 bg-slate-50">
+              <p className="text-xs font-semibold text-slate-600">Nouveau locataire</p>
+              <div className="grid grid-cols-2 gap-2">
+                <LF label="Prénom *">
+                  <Input className="text-sm" placeholder="Jean"
+                    value={newTenantForm.first_name}
+                    onChange={e => setNewTenantForm(f => ({ ...f, first_name: e.target.value }))} />
+                </LF>
+                <LF label="Nom *">
+                  <Input className="text-sm" placeholder="Dupont"
+                    value={newTenantForm.last_name}
+                    onChange={e => setNewTenantForm(f => ({ ...f, last_name: e.target.value }))} />
+                </LF>
+              </div>
+              <LF label="Email *">
+                <Input type="email" className="text-sm" placeholder="jean@exemple.com"
+                  value={newTenantForm.email}
+                  onChange={e => setNewTenantForm(f => ({ ...f, email: e.target.value }))} />
+              </LF>
+              <LF label="Téléphone">
+                <Input className="text-sm" placeholder="Optionnel"
+                  value={newTenantForm.phone}
+                  onChange={e => setNewTenantForm(f => ({ ...f, phone: e.target.value }))} />
+              </LF>
+              <div className="flex gap-2 pt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowNewTenant(false)}>
+                  Annuler
+                </Button>
+                <Button type="button" size="sm" onClick={handleCreateTenant}
+                  disabled={creatingTenant || !newTenantForm.first_name || !newTenantForm.last_name || !newTenantForm.email}
+                  className="text-[#063B26] font-semibold" style={{ backgroundColor: '#CFFF92' }}
+                >
+                  {creatingTenant ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                  Créer et ajouter
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button type="button" variant="outline" size="sm" onClick={() => setShowNewTenant(true)} className="flex items-center gap-1.5">
+              <UserPlus className="h-3.5 w-3.5" /> Nouveau locataire
+            </Button>
           )}
         </div>
 
@@ -1003,38 +1082,33 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
         {renderSection()}
       </div>
 
-      <Separator />
+      <div className="flex justify-center items-center gap-3 pt-4 border-t flex-wrap">
+        <Button type="button" variant="outline" size="sm"
+          onClick={() => {
+            if (isSigSec && sigSubStep === 'send') {
+              setSigSubStep('sign')
+            } else {
+              setSectionIndex(i => Math.max(0, i - 1))
+            }
+          }}
+          disabled={sectionIndex === 0 && sigSubStep === 'sign'}>
+          <ChevronLeft className="h-4 w-4 mr-1" /> Précédent
+        </Button>
 
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm"
-            onClick={() => {
-              if (isSigSec && sigSubStep === 'send') {
-                setSigSubStep('sign')
-              } else {
-                setSectionIndex(i => Math.max(0, i - 1))
-              }
-            }}
-            disabled={sectionIndex === 0 && sigSubStep === 'sign'}>
-            <ChevronLeft className="h-4 w-4 mr-1" /> Précédent
+        {!isLastSec && (
+          <Button type="button" size="sm"
+            onClick={() => setSectionIndex(i => Math.min(totalSec - 1, i + 1))}
+            className="text-[#063B26] font-semibold"
+            style={{ backgroundColor: '#CFFF92' }}>
+            Suivant <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
-          {!isLastSec && (
-            <Button type="button" size="sm"
-              onClick={() => setSectionIndex(i => Math.min(totalSec - 1, i + 1))}
-              className="text-[#063B26] font-semibold"
-              style={{ backgroundColor: '#CFFF92' }}>
-              Suivant <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          )}
-        </div>
+        )}
 
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm"
-            onClick={handleSaveDraft} disabled={saving || generating}>
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
-            Brouillon
-          </Button>
-        </div>
+        <Button type="button" variant="ghost" size="sm"
+          onClick={handleSaveDraft} disabled={saving || generating}>
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+          Brouillon
+        </Button>
       </div>
     </div>
   )

@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-import { generateDocumentPDF } from '@/lib/pdf/document'
+import { generateDocumentPDF, generateInspectionPDF, generateInventoryPDF } from '@/lib/pdf/document'
 
 export async function POST(req: Request) {
   const resend = new Resend(process.env.RESEND_API_KEY)
@@ -92,19 +92,31 @@ export async function POST(req: Request) {
         signature: newSignatures[t.id] ?? null,
       }))
 
-      const pdfBytes = await generateDocumentPDF({
-        type: doc.type,
+      const pdfInput = {
+        type: doc.type as 'lease' | 'entry_inspection' | 'exit_inspection' | 'inventory',
         title: doc.title,
         ownerName: `${owner?.first_name ?? ''} ${owner?.last_name ?? ''}`.trim(),
         ownerAddress: `${owner?.address ?? ''}, ${owner?.postal_code ?? ''} ${owner?.city ?? ''}`,
+        ownerEmail: owner?.email ?? undefined,
+        ownerPhone: owner?.phone ?? undefined,
         tenants,
         propertyAddress: doc.property?.address ?? '',
         propertyCity: doc.property?.city ?? '',
         propertyPostalCode: doc.property?.postal_code ?? '',
+        propertyType: doc.property?.type,
         content: updatedContent,
         ownerSignature: doc.owner_signature,
         date: doc.created_at,
-      })
+      }
+
+      let pdfBytes: Uint8Array
+      if (doc.type === 'entry_inspection' || doc.type === 'exit_inspection') {
+        pdfBytes = await generateInspectionPDF(pdfInput)
+      } else if (doc.type === 'inventory') {
+        pdfBytes = await generateInventoryPDF(pdfInput)
+      } else {
+        pdfBytes = await generateDocumentPDF(pdfInput)
+      }
 
       const fileName = `${doc.owner_id}/documents/${doc.id}.pdf`
       await serviceClient.storage
