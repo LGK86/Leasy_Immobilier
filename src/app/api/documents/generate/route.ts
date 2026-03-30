@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
     propertyAddress: doc.property?.address ?? '',
     propertyCity: doc.property?.city ?? '',
     propertyPostalCode: doc.property?.postal_code ?? '',
+    propertyType: doc.property?.type,
     content: doc.content ?? {},
     ownerSignature: doc.owner_signature,
     date: doc.created_at,

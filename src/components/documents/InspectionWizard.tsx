@@ -125,6 +125,8 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const [generating,   setGenerating]   = useState(false)
   const [propertyId,   setPropertyId]   = useState('')
   const [tenantId,     setTenantId]     = useState('')
+  const [surface,      setSurface]      = useState('')
+  const [roomsCount,   setRoomsCount]   = useState('')
   const [sectionIndex, setSectionIndex] = useState(0)
   const [ownerSig,     setOwnerSig]     = useState<string | null>(null)
   const [tenantSig,    setTenantSig]    = useState<string | null>(null)
@@ -150,6 +152,23 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const entryInspections = allDocuments.filter(
     d => d.type === 'entry_inspection' && d.property_id === propertyId
   )
+
+  // ── Property selection with auto-fill ────────────────────────
+  const handlePropertySelect = async (pid: string) => {
+    setPropertyId(pid)
+    setTenantId('')
+    if (pid) {
+      const { data: prop } = await supabase
+        .from('properties')
+        .select('surface, rooms_count')
+        .eq('id', pid)
+        .single()
+      if (prop) {
+        setSurface(prop.surface != null ? String(prop.surface) : '')
+        setRoomsCount(prop.rooms_count != null ? String(prop.rooms_count) : '')
+      }
+    }
+  }
 
   // ── Generic content updater ───────────────────────────────────
   const setField = (key: string, value: unknown) => {
@@ -185,13 +204,18 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const buildPayload = (status: 'draft' | 'sent') => {
     const prop = properties.find(p => p.id === propertyId)
     const title = prop ? `${TYPE_LABELS[type]} — ${prop.address}` : TYPE_LABELS[type]
+    const contentWithMeta = {
+      ...content,
+      surface:     parseFloat(surface) || null,
+      rooms_count: parseInt(roomsCount) || null,
+    }
     return {
       owner_id:        userId,
       property_id:     propertyId || null,
       tenant_id:       tenantId   || null,
       type,
       title,
-      content,
+      content:         contentWithMeta,
       owner_signature:  ownerSig,
       tenant_signature: tenantSig,
       status,
@@ -261,7 +285,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
         <LF label="Bien *">
           <Select
             value={propertyId || undefined}
-            onValueChange={(v: string | null) => { setPropertyId(v ?? ''); setTenantId('') }}
+            onValueChange={(v: string | null) => handlePropertySelect(v ?? '')}
           >
             <SelectTrigger className="w-full">
               <span className="flex-1 text-left truncate text-sm">
@@ -343,6 +367,23 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
             </Select>
           </LF>
         )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <TF
+            label="Surface (m2)"
+            value={surface}
+            onChange={setSurface}
+            type="number"
+            placeholder="45"
+          />
+          <TF
+            label="Nombre de pieces"
+            value={roomsCount}
+            onChange={setRoomsCount}
+            type="number"
+            placeholder="3"
+          />
+        </div>
 
         <TF
           label="Lieu de signature"

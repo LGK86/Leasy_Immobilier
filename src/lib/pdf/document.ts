@@ -20,6 +20,7 @@ export interface DocumentData {
   propertyAddress: string
   propertyCity: string
   propertyPostalCode: string
+  propertyType?: string
   content: Record<string, unknown>
   ownerSignature?: string | null
   date?: string
@@ -55,6 +56,15 @@ function sa(s: string): string {
     .replace(/[«»]/g,'"').replace(/[\u2018\u2019\u02BC]/g,"'")
     .replace(/[\u2013\u2014]/g,'-').replace(/\u2026/g,'...')
     .replace(/\u00A0/g,' ')
+}
+
+function formatDateDMY(dateStr?: string): string {
+  if (!dateStr) return '_______________'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return sa(dateStr)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  return `${dd}/${mm}/${d.getFullYear()}`
 }
 
 function formatDate(dateStr?: string): string {
@@ -95,7 +105,9 @@ function wrapLines(text: string, font: PDFFont, size: number, maxWidth: number):
 
 export async function generateDocumentPDF(data: DocumentData): Promise<Uint8Array> {
   if (data.type === 'lease') return generateLeasePDF(data)
-  return generateGenericPDF(data)
+  if (data.type === 'entry_inspection' || data.type === 'exit_inspection') return generateInspectionPDF(data)
+  if (data.type === 'inventory') return generateInventoryPDF(data)
+  return generateInspectionPDF(data) // fallback
 }
 
 // ── Bail meublé ALUR ─────────────────────────────────────────────────────────
@@ -452,132 +464,460 @@ async function generateLeasePDF(data: DocumentData): Promise<Uint8Array> {
   return pdfDoc.save()
 }
 
-// ── Generic PDF (entry/exit inspection, inventory) ───────────────────────────
+// ── Inspection PDF (entry / exit) ────────────────────────────────────────────
 
-const TYPE_LABELS: Record<string, string> = {
-  lease:            'CONTRAT DE BAIL',
-  entry_inspection: "ETAT DES LIEUX D'ENTREE",
-  exit_inspection:  "ETAT DES LIEUX DE SORTIE",
-  inventory:        'INVENTAIRE DU MOBILIER',
+const PROP_TYPE_LABELS: Record<string, string> = {
+  apartment: 'Appartement', house: 'Maison', studio: 'Studio', room: 'Chambre', other: 'Autre',
 }
 
-const INTERNAL_KEYS = new Set(['tenant_ids', 'tenant_signatures', '_tenant_ids', 'rent_split'])
-
-async function generateGenericPDF(data: DocumentData): Promise<Uint8Array> {
+async function generateInspectionPDF(data: DocumentData): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create()
-  let page = pdfDoc.addPage([595, 842])
-  const helvetica     = await pdfDoc.embedFont(StandardFonts.Helvetica)
-  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-  const { width, height } = page.getSize()
-  const margin = 60
-  let y = height - 60
+  const HLV  = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  const HLVB = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-  // Header
-  page.drawRectangle({ x: 0, y: height - 90, width, height: 90, color: COL_GREEN })
-  page.drawRectangle({ x: 0, y: height - 94, width, height: 4, color: COL_ACCENT })
-  page.drawText(sa(TYPE_LABELS[data.type] ?? data.title), {
-    x: margin, y: height - 44, size: 16, font: helveticaBold, color: COL_WHITE,
-  })
-  page.drawText(sa(`Leasy Immobilier — ${formatDate(data.date)}`), {
-    x: margin, y: height - 65, size: 9, font: helvetica, color: rgb(0.72, 0.88, 0.78),
-  })
+  const W = 595, H = 842, M = 50, CW = W - M * 2, FOOTER_H = 28
+  const ROW_H = 16
+  const ROW_ALT = rgb(0.973, 0.973, 0.973)
 
-  y = height - 115
+  let page: PDFPage = null!
+  let y = 0
+  let pageNum = 0
 
-  const drawSection = (title: string) => {
+  const addFooter = () => {
+    if (!page) return
+    page.drawRectangle({ x: 0, y: 0, width: W, height: FOOTER_H, color: rgb(0.97, 0.97, 0.97) })
+    page.drawLine({ start: { x: 0, y: FOOTER_H }, end: { x: W, y: FOOTER_H }, thickness: 0.5, color: COL_LINE })
+    page.drawText('Document genere par Leasy Immobilier', { x: M, y: 9, size: 7, font: HLV, color: COL_LIGHT })
+    page.drawText(`Page ${pageNum}`, { x: W - M - 25, y: 9, size: 7, font: HLV, color: COL_LIGHT })
+  }
+  const newPage = () => { addFooter(); page = pdfDoc.addPage([W, H]); pageNum++; y = H - M }
+  const checkY = (needed: number) => { if (y < FOOTER_H + needed + 10) newPage() }
+
+  const sectionTitle = (num: string, title: string) => {
+    checkY(30)
     y -= 6
-    page.drawText(sa(title).toUpperCase(), { x: margin, y, size: 9, font: helveticaBold, color: COL_MID })
-    y -= 5
-    page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: COL_LINE })
-    y -= 18
+    page.drawRectangle({ x: M - 4, y: y - 5, width: CW + 8, height: 21, color: COL_GREEN })
+    const label = num ? `${num}. ${sa(title)}` : sa(title)
+    page.drawText(label, { x: M + 2, y: y + 2, size: 9, font: HLVB, color: COL_WHITE })
+    y -= 24
   }
 
-  const drawField = (label: string, value: string) => {
-    if (y < 100) {
-      page = pdfDoc.addPage([595, 842])
-      y = height - 60
+  const field = (label: string, value: string) => {
+    checkY(16)
+    page.drawText(`${sa(label)} :`, { x: M, y, size: 9, font: HLVB, color: COL_MID })
+    page.drawText(sa(value) || '—', { x: M + 145, y, size: 9, font: HLV, color: COL_DARK })
+    y -= 14
+  }
+
+  const drawTable = (headers: string[], rows: string[][], colRatios: number[]) => {
+    const colW = colRatios.map(r => r * CW)
+
+    const drawHdr = () => {
+      checkY(ROW_H + 4)
+      page.drawRectangle({ x: M, y: y - ROW_H, width: CW, height: ROW_H, color: COL_GREEN })
+      let cx = M
+      headers.forEach((h, i) => {
+        page.drawText(sa(h), { x: cx + 4, y: y - ROW_H + 5, size: 8, font: HLVB, color: COL_WHITE })
+        cx += colW[i]
+      })
+      y -= ROW_H
     }
-    page.drawText(`${sa(label)} :`, { x: margin, y, size: 10, font: helveticaBold, color: COL_MID })
-    page.drawText(sa(value) || '—', { x: margin + 130, y, size: 10, font: helvetica, color: COL_DARK })
-    y -= 18
+
+    drawHdr()
+
+    rows.forEach((row, j) => {
+      if (y < FOOTER_H + ROW_H + 4) { newPage(); drawHdr() }
+      if (j % 2 === 1) page.drawRectangle({ x: M, y: y - ROW_H, width: CW, height: ROW_H, color: ROW_ALT })
+      let cx = M
+      row.forEach((cell, i) => {
+        let txt = sa(String(cell ?? ''))
+        const maxW = colW[i] - 8
+        if (HLV.widthOfTextAtSize(txt, 8) > maxW) {
+          while (txt.length > 4 && HLV.widthOfTextAtSize(txt.slice(0, -4) + '...', 8) > maxW) txt = txt.slice(0, -1)
+          txt = txt.slice(0, txt.length - 3) + '...'
+        }
+        page.drawText(txt, { x: cx + 4, y: y - ROW_H + 5, size: 8, font: HLV, color: COL_DARK })
+        cx += colW[i]
+      })
+      page.drawLine({ start: { x: M, y: y - ROW_H }, end: { x: M + CW, y: y - ROW_H }, thickness: 0.3, color: COL_LINE })
+      y -= ROW_H
+    })
   }
 
-  drawSection('Parties')
-  drawField('Bailleur', data.ownerName)
-  drawField('Adresse bailleur', data.ownerAddress)
-  for (let i = 0; i < data.tenants.length; i++) {
-    drawField(`Locataire ${i + 1}`, data.tenants[i].name)
-  }
-  y -= 10
+  const c = (data.content ?? {}) as Record<string, any>
+  const isExit = data.type === 'exit_inspection'
 
-  drawSection('Bien loue')
-  drawField('Adresse', data.propertyAddress)
-  drawField('Ville', `${data.propertyPostalCode} ${sa(data.propertyCity)}`)
-  y -= 10
+  // ── PAGE 1 — HEADER ────────────────────────────────────────────
 
-  const entries = Object.entries(data.content ?? {}).filter(([k]) => !INTERNAL_KEYS.has(k))
-  if (entries.length > 0) {
-    drawSection('Informations')
-    for (const [key, val] of entries) {
-      if (y < 100) { page = pdfDoc.addPage([595, 842]); y = height - 60 }
-      const label = key.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase())
-      drawField(label, String(val ?? ''))
+  newPage()
+
+  const HDR = 60
+  page.drawRectangle({ x: 0, y: H - HDR, width: W, height: HDR, color: COL_GREEN })
+  page.drawRectangle({ x: 0, y: H - HDR - 3, width: W, height: 3, color: COL_ACCENT })
+  page.drawText(isExit ? "ETAT DES LIEUX DE SORTIE" : "ETAT DES LIEUX D ENTREE", {
+    x: M, y: H - 36, size: 16, font: HLVB, color: COL_WHITE,
+  })
+  page.drawText("Conforme a la loi ALUR", { x: M, y: H - 52, size: 9, font: HLV, color: COL_ACCENT })
+
+  y = H - HDR - 15
+
+  // NOMENCLATURE
+  const NOM_H = 50
+  checkY(NOM_H + 10)
+  page.drawRectangle({ x: M, y: y - NOM_H, width: CW, height: NOM_H, color: rgb(0.97, 0.97, 0.97), borderColor: COL_LINE, borderWidth: 0.5 })
+  page.drawText('NOMENCLATURE :', { x: M + 8, y: y - 13, size: 8, font: HLVB, color: COL_MID })
+  const nomLines = [
+    'A : tres bon etat / neuf            D : mauvais etat',
+    'B : bon etat                        HS : hors service',
+    'C : etat d usage                    NV : non-verifie',
+  ]
+  nomLines.forEach((l, i) => { page.drawText(l, { x: M + 8, y: y - 26 - i * 10, size: 8, font: HLV, color: COL_DARK }) })
+  y -= NOM_H + 10
+
+  // ── 1. BAILLEUR ────────────────────────────────────────────────
+  sectionTitle('1', 'BAILLEUR')
+  field('Nom', data.ownerName)
+  field('Adresse', data.ownerAddress)
+  if (data.ownerEmail) field('Email', data.ownerEmail)
+  if (data.ownerPhone) field('Telephone', data.ownerPhone)
+  y -= 6
+
+  // ── 2. LOCATAIRES ──────────────────────────────────────────────
+  sectionTitle('2', data.tenants.length > 1 ? 'LOCATAIRES' : 'LOCATAIRE')
+  if (data.tenants.length === 0) {
+    checkY(14); page.drawText('—', { x: M + 10, y, size: 9, font: HLV, color: COL_LIGHT }); y -= 14
+  } else {
+    for (const t of data.tenants) {
+      field('Nom', t.name)
+      if (t.email) field('Email', t.email)
+      if (t.phone) field('Telephone', t.phone)
     }
   }
+  y -= 6
 
-  y -= 20
-  const tenants = data.tenants
-  const sigRowH = 110
-  const rowCount = tenants.length <= 1 ? 1 : 1 + Math.ceil(tenants.length / 2)
-  if (y < 40 + rowCount * sigRowH) { page = pdfDoc.addPage([595, 842]); y = height - 60 }
+  // ── 3. LOCAUX ──────────────────────────────────────────────────
+  sectionTitle('3', 'LOCAUX')
+  field('Type de logement', data.propertyType ? (PROP_TYPE_LABELS[data.propertyType] ?? sa(data.propertyType)) : '—')
+  field('Adresse', `${sa(data.propertyAddress)}, ${data.propertyPostalCode} ${sa(data.propertyCity)}`)
+  if (c.surface)      field('Surface', `${c.surface} m2`)
+  if (c.rooms_count)  field('Nombre de pieces', String(c.rooms_count))
+  if (c.inspection_date) field('Date de l etat des lieux', formatDateDMY(c.inspection_date))
+  if (c.description && sa(c.description).trim()) {
+    checkY(14); page.drawText('Description :', { x: M, y, size: 9, font: HLVB, color: COL_MID }); y -= 13
+    for (const line of wrapLines(sa(c.description), HLV, 8.5, CW - 10)) {
+      checkY(12); page.drawText(line, { x: M + 10, y, size: 8.5, font: HLV, color: COL_DARK }); y -= 13
+    }
+  }
+  y -= 6
 
-  drawSection('Signatures')
-  y -= 10
+  // ── 4. MOYENS D'ACCES ─────────────────────────────────────────
+  sectionTitle('4', "MOYENS D ACCES")
+  const accessKeys = Array.isArray(c.access_keys) ? c.access_keys : []
+  if (accessKeys.length > 0) {
+    drawTable(
+      ['Type', 'Destination', 'Quantite'],
+      accessKeys.map((k: any) => [k.key_type ?? '', k.destination ?? '', String(k.quantity ?? '')]),
+      [0.3, 0.5, 0.2]
+    )
+  } else {
+    checkY(14); page.drawText('Aucun moyen d acces renseigne.', { x: M + 10, y, size: 8.5, font: HLV, color: COL_LIGHT }); y -= 14
+  }
+  y -= 8
 
-  const col0 = margin, col1 = width / 2 + 20
-  const boxW = 190, boxH = 80
+  // ── 5. ACCESSOIRES ────────────────────────────────────────────
+  sectionTitle('5', 'ACCESSOIRES ET EQUIPEMENTS')
+  const accessories = Array.isArray(c.accessories) ? c.accessories : []
+  if (accessories.length > 0) {
+    drawTable(
+      ['Accessoire', 'Etat'],
+      accessories.map((a: any) => [a.name ?? '', a.condition ?? '']),
+      [0.75, 0.25]
+    )
+  } else {
+    checkY(14); page.drawText('Aucun accessoire renseigne.', { x: M + 10, y, size: 8.5, font: HLV, color: COL_LIGHT }); y -= 14
+  }
+  y -= 8
 
-  const drawSigBox = async (bx: number, by: number, label: string, sigDataUrl?: string | null) => {
-    page.drawText(sa(label), { x: bx, y: by + boxH + 4, size: 9, font: helveticaBold, color: COL_MID })
-    page.drawRectangle({ x: bx, y: by, width: boxW, height: boxH, borderColor: COL_LINE, borderWidth: 1, color: rgb(0.97,0.98,1) })
+  // ── 6. CHAUFFAGE ──────────────────────────────────────────────
+  sectionTitle('6', 'CHAUFFAGE')
+  const h = (c.heating ?? {}) as Record<string, any>
+  field('Type', sa(h.type ?? ''))
+  field('Localisation', sa(h.location ?? ''))
+  field('Etat general', sa(h.general_condition ?? ''))
+  if (h.radiator_count) {
+    field('Nombre de radiateurs', String(h.radiator_count))
+    field('Etat des radiateurs', sa(h.radiator_condition ?? ''))
+  }
+  y -= 6
+
+  // ── 7. RELEVE DES COMPTEURS ───────────────────────────────────
+  sectionTitle('7', 'RELEVE DES COMPTEURS')
+  const meters = Array.isArray(c.meters) ? c.meters : []
+  if (meters.length > 0) {
+    drawTable(
+      ['Energie', 'Fournisseur', 'Localisation', 'Releve', 'Date'],
+      meters.map((m: any) => [
+        m.energy_type ?? '', m.provider ?? '', m.location ?? '',
+        m.reading ?? '', m.reading_date ? formatDateDMY(m.reading_date) : '',
+      ]),
+      [0.15, 0.18, 0.27, 0.18, 0.22]
+    )
+  } else {
+    checkY(14); page.drawText('Aucun compteur renseigne.', { x: M + 10, y, size: 8.5, font: HLV, color: COL_LIGHT }); y -= 14
+  }
+  y -= 8
+
+  // ── 8+. PIECES ────────────────────────────────────────────────
+  const rooms = Array.isArray(c.rooms) ? c.rooms : []
+  rooms.forEach((room: any, ri: number) => {
+    sectionTitle(String(8 + ri), sa(room.name ?? `Piece ${ri + 1}`).toUpperCase())
+    const elements = Array.isArray(room.elements) ? room.elements : []
+    if (elements.length > 0) {
+      drawTable(
+        ['Element', 'Description / Commentaire', 'Etat'],
+        elements.map((el: any) => {
+          const desc = [sa(el.description ?? ''), sa(el.comment ?? '')].filter(Boolean).join(' / ')
+          return [el.name ?? '', desc, el.condition ?? '']
+        }),
+        [0.28, 0.57, 0.15]
+      )
+    } else {
+      checkY(14); page.drawText('Aucun element renseigne.', { x: M + 10, y, size: 8.5, font: HLV, color: COL_LIGHT }); y -= 14
+    }
+    if (room.remarks && sa(room.remarks).trim()) {
+      y -= 4; checkY(13)
+      const remarkLines = wrapLines(`Remarques : ${sa(room.remarks)}`, HLV, 8, CW - 10)
+      for (const line of remarkLines) { checkY(12); page.drawText(line, { x: M + 10, y, size: 8, font: HLV, color: COL_MID }); y -= 12 }
+    }
+    y -= 6
+  })
+
+  // ── OBSERVATIONS ET SIGNATURES ────────────────────────────────
+  sectionTitle('', 'OBSERVATIONS ET SIGNATURES')
+
+  if (c.general_observations && sa(c.general_observations).trim()) {
+    checkY(14); page.drawText('Observations generales :', { x: M, y, size: 9, font: HLVB, color: COL_MID }); y -= 14
+    for (const line of wrapLines(sa(c.general_observations), HLV, 8.5, CW - 10)) {
+      checkY(12); page.drawText(line, { x: M + 10, y, size: 8.5, font: HLV, color: COL_DARK }); y -= 13
+    }
+    y -= 6
+  }
+
+  const legalText = "Le present etat des lieux etabli contradictoirement entre les parties qui le reconnaissent, fait partie integrante du contrat de location dont il ne peut etre dissocie."
+  for (const line of wrapLines(legalText, HLV, 8, CW - 4)) {
+    checkY(12); page.drawText(line, { x: M + 2, y, size: 8, font: HLV, color: COL_MID }); y -= 12
+  }
+  y -= 8
+
+  const location = sa(c.location ?? data.propertyCity ?? '')
+  const copies = c.copies_count ?? 2
+  checkY(14)
+  page.drawText(
+    `Fait a ${location}, le ${formatDateDMY(c.inspection_date ?? data.date)}, en ${copies} exemplaire${copies > 1 ? 's' : ''}.`,
+    { x: M, y, size: 9, font: HLV, color: COL_DARK }
+  )
+  y -= 24
+
+  // Signatures
+  const SBH = 80
+  const SBW = (CW - 20) / 2
+  checkY(SBH + 40)
+
+  const drawSigBox = async (bx: number, by: number, label: string, subLabel: string, sigDataUrl?: string | null) => {
+    page.drawText(sa(label),    { x: bx, y: by + SBH + 14, size: 9, font: HLVB, color: COL_MID })
+    page.drawText(sa(subLabel), { x: bx, y: by + SBH +  3, size: 8, font: HLV,  color: COL_LIGHT })
+    page.drawRectangle({ x: bx, y: by, width: SBW, height: SBH, borderColor: COL_LINE, borderWidth: 1, color: rgb(0.98, 0.99, 1) })
     if (sigDataUrl) {
-      const sigData = sigDataUrl.replace(/^data:image\/\w+;base64,/, '')
       try {
+        const sigData = sigDataUrl.replace(/^data:image\/\w+;base64,/, '')
         const img = await pdfDoc.embedPng(Buffer.from(sigData, 'base64'))
         const d = img.scale(0.3)
-        page.drawImage(img, { x: bx + 10, y: by + 10, width: Math.min(d.width, boxW - 20), height: Math.min(d.height, boxH - 20) })
+        page.drawImage(img, { x: bx + 8, y: by + 8, width: Math.min(d.width, SBW - 16), height: Math.min(d.height, SBH - 16) })
       } catch { /* ignore */ }
     } else {
-      page.drawText('Non signe', { x: bx + 60, y: by + 35, size: 9, font: helvetica, color: rgb(0.7,0.75,0.8) })
+      page.drawText('Non signe', { x: bx + SBW / 2 - 22, y: by + SBH / 2 - 4, size: 8, font: HLV, color: rgb(0.75, 0.78, 0.85) })
     }
   }
 
-  if (tenants.length <= 1) {
-    const rowY = y - boxH
-    await drawSigBox(col0, rowY, 'Signature du bailleur', data.ownerSignature)
-    if (tenants.length === 1) await drawSigBox(col1, rowY, `Signature de ${sa(tenants[0].name)}`, tenants[0].signature)
-    y = rowY - 20
+  await drawSigBox(M,          y - SBH, 'Le(s) bailleur(s)',   'certifie(nt) exact', data.ownerSignature)
+  await drawSigBox(M + SBW + 20, y - SBH, 'Le(s) locataire(s)', 'certifie(nt) exact', data.tenants[0]?.signature ?? null)
+
+  addFooter()
+  return pdfDoc.save()
+}
+
+// ── Inventory PDF ─────────────────────────────────────────────────────────────
+
+async function generateInventoryPDF(data: DocumentData): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.create()
+  const HLV  = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  const HLVB = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+
+  const W = 595, H = 842, M = 50, CW = W - M * 2, FOOTER_H = 28
+  const ROW_H = 16
+  const ROW_ALT = rgb(0.973, 0.973, 0.973)
+
+  let page: PDFPage = null!
+  let y = 0
+  let pageNum = 0
+
+  const addFooter = () => {
+    if (!page) return
+    page.drawRectangle({ x: 0, y: 0, width: W, height: FOOTER_H, color: rgb(0.97, 0.97, 0.97) })
+    page.drawLine({ start: { x: 0, y: FOOTER_H }, end: { x: W, y: FOOTER_H }, thickness: 0.5, color: COL_LINE })
+    page.drawText('Document genere par Leasy Immobilier', { x: M, y: 9, size: 7, font: HLV, color: COL_LIGHT })
+    page.drawText(`Page ${pageNum}`, { x: W - M - 25, y: 9, size: 7, font: HLV, color: COL_LIGHT })
+  }
+  const newPage = () => { addFooter(); page = pdfDoc.addPage([W, H]); pageNum++; y = H - M }
+  const checkY  = (needed: number) => { if (y < FOOTER_H + needed + 10) newPage() }
+
+  const sectionTitle = (num: string, title: string) => {
+    checkY(30); y -= 6
+    page.drawRectangle({ x: M - 4, y: y - 5, width: CW + 8, height: 21, color: COL_GREEN })
+    const label = num ? `${num}. ${sa(title)}` : sa(title)
+    page.drawText(label, { x: M + 2, y: y + 2, size: 9, font: HLVB, color: COL_WHITE })
+    y -= 24
+  }
+  const field = (label: string, value: string) => {
+    checkY(16)
+    page.drawText(`${sa(label)} :`, { x: M, y, size: 9, font: HLVB, color: COL_MID })
+    page.drawText(sa(value) || '—', { x: M + 145, y, size: 9, font: HLV, color: COL_DARK })
+    y -= 14
+  }
+  const drawTable = (headers: string[], rows: string[][], colRatios: number[]) => {
+    const colW = colRatios.map(r => r * CW)
+    const drawHdr = () => {
+      checkY(ROW_H + 4)
+      page.drawRectangle({ x: M, y: y - ROW_H, width: CW, height: ROW_H, color: COL_GREEN })
+      let cx = M
+      headers.forEach((h, i) => { page.drawText(sa(h), { x: cx + 4, y: y - ROW_H + 5, size: 8, font: HLVB, color: COL_WHITE }); cx += colW[i] })
+      y -= ROW_H
+    }
+    drawHdr()
+    rows.forEach((row, j) => {
+      if (y < FOOTER_H + ROW_H + 4) { newPage(); drawHdr() }
+      if (j % 2 === 1) page.drawRectangle({ x: M, y: y - ROW_H, width: CW, height: ROW_H, color: ROW_ALT })
+      let cx = M
+      row.forEach((cell, i) => {
+        let txt = sa(String(cell ?? ''))
+        const maxW = colW[i] - 8
+        if (HLV.widthOfTextAtSize(txt, 8) > maxW) {
+          while (txt.length > 4 && HLV.widthOfTextAtSize(txt.slice(0, -4) + '...', 8) > maxW) txt = txt.slice(0, -1)
+          txt = txt.slice(0, txt.length - 3) + '...'
+        }
+        page.drawText(txt, { x: cx + 4, y: y - ROW_H + 5, size: 8, font: HLV, color: COL_DARK })
+        cx += colW[i]
+      })
+      page.drawLine({ start: { x: M, y: y - ROW_H }, end: { x: M + CW, y: y - ROW_H }, thickness: 0.3, color: COL_LINE })
+      y -= ROW_H
+    })
+  }
+
+  const c = (data.content ?? {}) as Record<string, any>
+
+  newPage()
+
+  const HDR = 60
+  page.drawRectangle({ x: 0, y: H - HDR, width: W, height: HDR, color: COL_GREEN })
+  page.drawRectangle({ x: 0, y: H - HDR - 3, width: W, height: 3, color: COL_ACCENT })
+  page.drawText('INVENTAIRE DU MOBILIER', { x: M, y: H - 36, size: 16, font: HLVB, color: COL_WHITE })
+  page.drawText('Conforme a la loi ALUR', { x: M, y: H - 52, size: 9, font: HLV, color: COL_ACCENT })
+
+  y = H - HDR - 20
+
+  sectionTitle('1', 'BAILLEUR')
+  field('Nom', data.ownerName)
+  field('Adresse', data.ownerAddress)
+  if (data.ownerEmail) field('Email', data.ownerEmail)
+  if (data.ownerPhone) field('Telephone', data.ownerPhone)
+  y -= 6
+
+  sectionTitle('2', data.tenants.length > 1 ? 'LOCATAIRES' : 'LOCATAIRE')
+  if (data.tenants.length === 0) {
+    checkY(14); page.drawText('—', { x: M + 10, y, size: 9, font: HLV, color: COL_LIGHT }); y -= 14
   } else {
-    let rowY = y - boxH
-    await drawSigBox(col0, rowY, 'Signature du bailleur', data.ownerSignature)
-    await drawSigBox(col1, rowY, `Signature de ${sa(tenants[0].name)}`, tenants[0].signature)
-    y = rowY - sigRowH
-    for (let i = 1; i < tenants.length; i += 2) {
-      rowY = y - boxH
-      await drawSigBox(col0, rowY, `Signature de ${sa(tenants[i].name)}`, tenants[i].signature)
-      if (i + 1 < tenants.length) await drawSigBox(col1, rowY, `Signature de ${sa(tenants[i+1].name)}`, tenants[i+1].signature)
-      y = rowY - sigRowH
+    for (const t of data.tenants) {
+      field('Nom', t.name)
+      if (t.email) field('Email', t.email)
+      if (t.phone) field('Telephone', t.phone)
+    }
+  }
+  y -= 6
+
+  sectionTitle('3', 'BIEN')
+  field('Type de logement', data.propertyType ? (PROP_TYPE_LABELS[data.propertyType] ?? sa(data.propertyType)) : '—')
+  field('Adresse', `${sa(data.propertyAddress)}, ${data.propertyPostalCode} ${sa(data.propertyCity)}`)
+  if (c.surface)      field('Surface', `${c.surface} m2`)
+  if (c.rooms_count)  field('Nombre de pieces', String(c.rooms_count))
+  if (c.inventory_date) field('Date de l inventaire', formatDateDMY(c.inventory_date))
+  y -= 6
+
+  const rooms = Array.isArray(c.rooms) ? c.rooms : []
+  rooms.forEach((room: any, ri: number) => {
+    sectionTitle(String(4 + ri), sa(room.name ?? `Piece ${ri + 1}`).toUpperCase())
+    const items = Array.isArray(room.items) ? room.items : []
+    if (items.length > 0) {
+      drawTable(
+        ['Objet', 'Quantite', 'Etat', 'Commentaire'],
+        items.map((item: any) => [
+          item.name ?? '', String(item.quantity ?? 1), item.condition ?? '', sa(item.comment ?? ''),
+        ]),
+        [0.40, 0.10, 0.25, 0.25]
+      )
+    } else {
+      checkY(14); page.drawText('Aucun objet renseigne.', { x: M + 10, y, size: 8.5, font: HLV, color: COL_LIGHT }); y -= 14
+    }
+    y -= 6
+  })
+
+  sectionTitle('', 'OBSERVATIONS ET SIGNATURES')
+
+  if (c.general_observations && sa(c.general_observations).trim()) {
+    checkY(14); page.drawText('Observations generales :', { x: M, y, size: 9, font: HLVB, color: COL_MID }); y -= 14
+    for (const line of wrapLines(sa(c.general_observations), HLV, 8.5, CW - 10)) {
+      checkY(12); page.drawText(line, { x: M + 10, y, size: 8.5, font: HLV, color: COL_DARK }); y -= 13
+    }
+    y -= 6
+  }
+
+  const legalText = "Le present inventaire etabli contradictoirement entre les parties qui le reconnaissent, fait partie integrante du contrat de location dont il ne peut etre dissocie."
+  for (const line of wrapLines(legalText, HLV, 8, CW - 4)) {
+    checkY(12); page.drawText(line, { x: M + 2, y, size: 8, font: HLV, color: COL_MID }); y -= 12
+  }
+  y -= 8
+
+  const location = sa(c.location ?? data.propertyCity ?? '')
+  const copies = c.copies_count ?? 2
+  checkY(14)
+  page.drawText(
+    `Fait a ${location}, le ${formatDateDMY(c.inventory_date ?? data.date)}, en ${copies} exemplaire${copies > 1 ? 's' : ''}.`,
+    { x: M, y, size: 9, font: HLV, color: COL_DARK }
+  )
+  y -= 24
+
+  const SBH = 80
+  const SBW = (CW - 20) / 2
+  checkY(SBH + 40)
+
+  const drawSigBox = async (bx: number, by: number, label: string, subLabel: string, sigDataUrl?: string | null) => {
+    page.drawText(sa(label),    { x: bx, y: by + SBH + 14, size: 9, font: HLVB, color: COL_MID })
+    page.drawText(sa(subLabel), { x: bx, y: by + SBH +  3, size: 8, font: HLV,  color: COL_LIGHT })
+    page.drawRectangle({ x: bx, y: by, width: SBW, height: SBH, borderColor: COL_LINE, borderWidth: 1, color: rgb(0.98, 0.99, 1) })
+    if (sigDataUrl) {
+      try {
+        const sigData = sigDataUrl.replace(/^data:image\/\w+;base64,/, '')
+        const img = await pdfDoc.embedPng(Buffer.from(sigData, 'base64'))
+        const d = img.scale(0.3)
+        page.drawImage(img, { x: bx + 8, y: by + 8, width: Math.min(d.width, SBW - 16), height: Math.min(d.height, SBH - 16) })
+      } catch { /* ignore */ }
+    } else {
+      page.drawText('Non signe', { x: bx + SBW / 2 - 22, y: by + SBH / 2 - 4, size: 8, font: HLV, color: rgb(0.75, 0.78, 0.85) })
     }
   }
 
-  // Footer on all pages
-  for (let i = 0; i < pdfDoc.getPageCount(); i++) {
-    const p = pdfDoc.getPage(i)
-    const pw = p.getWidth()
-    p.drawRectangle({ x: 0, y: 0, width: pw, height: 30, color: rgb(0.97,0.97,0.97) })
-    p.drawText('Document genere par Leasy Immobilier', { x: margin, y: 10, size: 7, font: helvetica, color: COL_LIGHT })
-    p.drawText(`Page ${i + 1}`, { x: pw - margin - 25, y: 10, size: 7, font: helvetica, color: COL_LIGHT })
-  }
+  await drawSigBox(M,              y - SBH, 'Le(s) bailleur(s)',   'certifie(nt) exact', data.ownerSignature)
+  await drawSigBox(M + SBW + 20,   y - SBH, 'Le(s) locataire(s)', 'certifie(nt) exact', data.tenants[0]?.signature ?? null)
 
+  addFooter()
   return pdfDoc.save()
 }

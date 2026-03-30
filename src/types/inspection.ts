@@ -58,6 +58,8 @@ export interface InspectionContent {
   type: 'entry' | 'exit'
   inspection_date: string
   description: string
+  surface?: number | null
+  rooms_count?: number | null
   access_keys: AccessKey[]
   accessories: Accessory[]
   heating: Heating
@@ -87,6 +89,8 @@ export interface InventoryRoom {
 export interface InventoryContent {
   inventory_date: string
   linked_inspection_id: string | null
+  surface?: number | null
+  rooms_count?: number | null
   rooms: InventoryRoom[]
   general_observations: string
   location: string

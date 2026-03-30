@@ -31,6 +31,8 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
     deposit: property?.deposit?.toString() ?? '',
     status: property?.status ?? 'vacant',
     description: property?.description ?? '',
+    surface: property?.surface?.toString() ?? '',
+    rooms_count: property?.rooms_count?.toString() ?? '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,6 +50,8 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
       deposit: parseFloat(form.deposit) || 0,
       status: form.status,
       description: form.description || null,
+      surface: parseFloat(form.surface) || null,
+      rooms_count: parseInt(form.rooms_count) || null,
       updated_at: new Date().toISOString(),
     }
 
@@ -133,6 +137,16 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
               <SelectItem value="vacant">Vacant</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label>Surface (m²)</Label>
+          <Input type="number" inputMode="decimal" placeholder="45" value={form.surface} onChange={set('surface')} />
+        </div>
+        <div className="space-y-2">
+          <Label>Nombre de pièces</Label>
+          <Input type="number" inputMode="numeric" placeholder="3" value={form.rooms_count} onChange={set('rooms_count')} />
         </div>
       </div>
       <div className="grid grid-cols-3 gap-3">

@@ -23,6 +23,8 @@ export type Property = {
   deposit: number
   status: 'rented' | 'vacant'
   description: string | null
+  surface: number | null
+  rooms_count: number | null
   created_at: string
   updated_at: string
 }
