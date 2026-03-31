@@ -13,16 +13,20 @@ import { useRouter } from 'next/navigation'
 import type { Property } from '@/types/database'
 
 type PropertyWithDocs = Property & {
-  documents?: { id: string; type: string; status: string }[]
+  documents?: { id: string; type: string; status: string; content?: any }[]
 }
 
-function getLeaseBadge(documents?: { id: string; type: string; status: string }[]) {
+function getLeaseBadge(documents?: { id: string; type: string; status: string; content?: any }[]) {
   const leases = (documents ?? []).filter(d => d.type === 'lease')
   if (leases.length === 0) return { label: 'Aucun bail', className: 'bg-slate-100 text-slate-500 whitespace-nowrap' }
-  const latest = leases[leases.length - 1]
-  if (latest.status === 'finalized') return { label: 'Bail signé', className: 'bg-emerald-100 text-emerald-700 whitespace-nowrap' }
-  if (latest.status === 'signed' || latest.status === 'pending_tenant_signature') return { label: 'Bail en attente', className: 'bg-orange-100 text-orange-700 whitespace-nowrap' }
-  return { label: 'Aucun bail', className: 'bg-slate-100 text-slate-500 whitespace-nowrap' }
+  // Sort by most recent and find an active lease (not closed)
+  const activeLease = [...leases].reverse().find(d =>
+    ['signed', 'pending_tenant_signature', 'finalized'].includes(d.status) &&
+    !d.content?.closed_at
+  )
+  if (!activeLease) return { label: 'Aucun bail', className: 'bg-slate-100 text-slate-500 whitespace-nowrap' }
+  if (activeLease.status === 'finalized') return { label: 'Bail signé', className: 'bg-emerald-100 text-emerald-700 whitespace-nowrap' }
+  return { label: 'Bail en attente', className: 'bg-orange-100 text-orange-700 whitespace-nowrap' }
 }
 import {
   AlertDialog,

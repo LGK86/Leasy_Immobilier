@@ -127,6 +127,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const [linkEntryInspection, setLinkEntryInspection] = useState(false)
   const [linkedEntryId,       setLinkedEntryId]       = useState('')
   const [linkedEntryInspection, setLinkedEntryInspection] = useState<any>(null)
+  const [minInspectionDate,   setMinInspectionDate]   = useState('')
   const [localTenants,        setLocalTenants]        = useState<Tenant[]>(tenants)
   const [showNewTenant,       setShowNewTenant]       = useState(false)
   const [newTenantForm,       setNewTenantForm]       = useState({ first_name: '', last_name: '', email: '', phone: '' })
@@ -197,23 +198,44 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   }
   const removeTenant = (id: string) => setTenantIds(prev => prev.filter(t => t !== id))
 
-  // Pre-fill inspection_date from first tenant's entry_date (entry_inspection only, when date is empty)
+  // Pre-fill inspection_date from active lease start date (entry_inspection only, when date is empty)
   useEffect(() => {
     if (type !== 'entry_inspection') return
-    if (tenantIds.length === 0) return
-    console.log('[InspectionWizard] tenantIds changed:', tenantIds)
-    console.log('[InspectionWizard] localTenants available:', localTenants.map(t => ({ id: t.id, entry_date: t.entry_date })))
-    const firstTenant = localTenants.find(t => tenantIds.includes(t.id))
-    console.log('[InspectionWizard] firstTenant found:', firstTenant)
-    console.log('[InspectionWizard] entry_date:', firstTenant?.entry_date)
-    setContent(prev => {
-      const ic = prev as InspectionContent
-      if (ic.inspection_date) return prev
-      if (!firstTenant?.entry_date) return prev
-      return { ...prev, inspection_date: firstTenant.entry_date } as InspectionContent
-    })
+    if (tenantIds.length === 0 || !propertyId) return
+
+    const fetchLeaseStartDate = async () => {
+      const { data: lease } = await supabase
+        .from('documents')
+        .select('content')
+        .eq('property_id', propertyId)
+        .eq('type', 'lease')
+        .in('status', ['signed', 'finalized', 'pending_tenant_signature'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const startDate: string | undefined =
+        lease?.content?.["Date d'entree"] ||
+        lease?.content?.["Date d'entrée"] ||
+        lease?.content?.start_date
+
+      console.log('[InspectionWizard] Lease content:', lease?.content)
+      console.log('[InspectionWizard] Lease start date:', startDate)
+
+      if (startDate) {
+        setMinInspectionDate(startDate)
+        setContent(prev => {
+          const ic = prev as InspectionContent
+          if (ic.inspection_date) return prev
+          console.log('[InspectionWizard] Pre-filling inspection_date from lease:', startDate)
+          return { ...prev, inspection_date: startDate } as InspectionContent
+        })
+      }
+    }
+
+    fetchLeaseStartDate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantIds])
+  }, [tenantIds, propertyId])
 
   // ── Generic content updater ───────────────────────────────────
   const setField = (key: string, value: unknown) => {
@@ -551,7 +573,13 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
             value={isInventory ? vc.inventory_date : ic.inspection_date}
             onChange={e => setField(isInventory ? 'inventory_date' : 'inspection_date', e.target.value)}
             className="text-sm"
+            min={!isInventory && type === 'entry_inspection' && minInspectionDate ? minInspectionDate : undefined}
           />
+          {type === 'entry_inspection' && minInspectionDate && ic.inspection_date && ic.inspection_date < minInspectionDate && (
+            <p className="text-amber-600 text-xs mt-1">
+              ⚠️ La date de l&apos;état des lieux est antérieure à la date de début du bail ({new Date(minInspectionDate).toLocaleDateString('fr-FR')})
+            </p>
+          )}
           {type === 'exit_inspection' && linkedEntryInspection && ic.inspection_date &&
             linkedEntryInspection.content?.inspection_date &&
             new Date(ic.inspection_date) <= new Date(linkedEntryInspection.content.inspection_date) && (
