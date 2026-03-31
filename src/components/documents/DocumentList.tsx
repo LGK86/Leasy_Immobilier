@@ -264,8 +264,8 @@ export default function DocumentList({ documents, properties, tenants, userId }:
           onOpenChange={v => { if (!v) { setOpenInspectionCreation(null); router.refresh() } }}
         >
           <DialogContent
-            className="p-0 gap-0 overflow-hidden"
-            style={{ width: '55vw', height: '90vh', maxWidth: '55vw', maxHeight: '90vh', minWidth: '55vw', minHeight: '90vh' }}
+            className="p-0 gap-0"
+            style={{ width: '55vw', height: '90vh', maxWidth: '55vw', maxHeight: '90vh', minWidth: '55vw', minHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0 }}
           >
             <div className="flex flex-col h-full overflow-hidden">
               <div className="flex-shrink-0 px-6 pt-5 pb-4 border-b">

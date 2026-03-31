@@ -474,17 +474,17 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
   // ── Nav ───────────────────────────────────────────────────────────────────
 
   const Nav = () => (
-    <div className="flex gap-2 mt-6 pt-4 border-t border-slate-100">
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', padding: '16px 24px', borderTop: '1px solid #e5e7eb', backgroundColor: 'white', flexShrink: 0 }}>
       {section > 1 && (
-        <Button variant="outline" size="sm" onClick={() => setSection(s => s - 1)} className="flex items-center gap-1">
-          <ChevronLeft className="h-4 w-4" /> Précédent
+        <Button variant="outline" onClick={() => setSection(s => s - 1)}>
+          Précédent
         </Button>
       )}
-      <Button size="sm" onClick={handleNext} disabled={!canProceed() || creatingDoc}
-        className="ml-auto flex items-center gap-1 text-[#063B26] font-semibold disabled:opacity-50"
+      <Button onClick={handleNext} disabled={!canProceed() || creatingDoc}
+        className="text-[#063B26] font-semibold disabled:opacity-50"
         style={{ backgroundColor: '#CFFF92' }}
       >
-        {section < total ? <>Suivant <ChevronRight className="h-4 w-4" /></> : 'Enregistrer et continuer'}
+        {section < total ? 'Suivant' : 'Enregistrer et continuer'}
       </Button>
     </div>
   )

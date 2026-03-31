@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -194,20 +194,22 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const addTenant = (id: string) => {
     if (!id || tenantIds.includes(id)) return
     setTenantIds(prev => [...prev, id])
-    // For entry_inspection: pre-fill inspection date from tenant's entry_date
-    if (type === 'entry_inspection' && !(content as InspectionContent).inspection_date) {
-      const tenant = localTenants.find(t => t.id === id)
-      if (tenant?.entry_date) {
-        setField('inspection_date', tenant.entry_date)
-      } else {
-        // Fetch from DB if not in local state
-        supabase.from('tenants').select('entry_date').eq('id', id).single().then(({ data }) => {
-          if (data?.entry_date) setField('inspection_date', data.entry_date)
-        })
-      }
-    }
   }
   const removeTenant = (id: string) => setTenantIds(prev => prev.filter(t => t !== id))
+
+  // Pre-fill inspection_date from first tenant's entry_date (entry_inspection only, when date is empty)
+  useEffect(() => {
+    if (type !== 'entry_inspection') return
+    if (tenantIds.length === 0) return
+    setContent(prev => {
+      const ic = prev as InspectionContent
+      if (ic.inspection_date) return prev
+      const firstTenant = localTenants.find(t => tenantIds.includes(t.id))
+      if (!firstTenant?.entry_date) return prev
+      return { ...prev, inspection_date: firstTenant.entry_date } as InspectionContent
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantIds])
 
   // ── Generic content updater ───────────────────────────────────
   const setField = (key: string, value: unknown) => {
@@ -849,79 +851,104 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
         </div>
 
         {isComparison ? (
-          <div style={{ width: '100%', overflowX: 'hidden' }}>
-            {/* Comparison header */}
-            <div className="grid items-center mb-2 gap-2" style={{ gridTemplateColumns: '20% 15% 65%' }}>
-              <div className="text-sm font-semibold text-gray-600" style={{ overflow: 'hidden', minWidth: 0 }}>Élément</div>
-              <div className="text-sm font-semibold text-center text-gray-500 bg-gray-100 rounded px-2 py-1" style={{ overflow: 'hidden', minWidth: 0 }}>Entrée</div>
-              <div className="text-sm font-semibold text-center text-white rounded px-2 py-1" style={{ backgroundColor: '#063B26', overflow: 'hidden', minWidth: 0 }}>Sortie</div>
-            </div>
-            {room.elements.map((el: any, j: number) => {
-              const entryEl = entryRoom?.elements?.find((e: any) => e.name === el.name) ?? entryRoom?.elements?.[j]
-              return (
-                <div key={j} className="grid items-start gap-2 py-2 border-b border-gray-100" style={{ gridTemplateColumns: '20% 15% 65%' }}>
-                  <div className="text-sm font-medium pt-2" style={{ overflow: 'hidden', minWidth: 0, textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{el.name || '—'}</div>
-                  <div className="flex flex-col gap-1 bg-gray-50 rounded p-2 text-sm text-gray-500" style={{ overflow: 'hidden', minWidth: 0 }}>
-                    <span className="font-mono font-bold">{entryEl?.condition || '—'}</span>
-                    {entryEl?.description && <span className="text-xs truncate">{entryEl.description}</span>}
-                  </div>
-                  <div className="flex flex-col gap-2" style={{ overflow: 'hidden', minWidth: 0 }}>
-                    <Select value={el.condition}
-                      onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
-                      <SelectTrigger className="w-full"><span className="text-sm">{el.condition}</span></SelectTrigger>
-                      <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-                    </Select>
-                    <Input className="text-sm" placeholder="Commentaire..."
-                      value={el.comment}
-                      onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], comment: e.target.value }; return { ...r, elements: els } })} />
-                  </div>
-                </div>
-              )
-            })}
+          <div>
+            <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+              <colgroup>
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '60%' }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th style={{ padding: '8px', textAlign: 'left', fontSize: '12px', fontWeight: 500, color: '#6b7280' }}>Élément</th>
+                  <th style={{ padding: '8px', textAlign: 'center', fontSize: '12px', fontWeight: 500, backgroundColor: '#f1f5f9', color: '#475569' }}>Entrée</th>
+                  <th style={{ padding: '8px', textAlign: 'center', fontSize: '12px', fontWeight: 500, backgroundColor: '#063B26', color: 'white' }}>Sortie</th>
+                </tr>
+              </thead>
+              <tbody>
+                {room.elements.map((el: any, j: number) => {
+                  const entryEl = entryRoom?.elements?.find((e: any) => e.name === el.name) ?? entryRoom?.elements?.[j]
+                  return (
+                    <tr key={j} style={{ backgroundColor: j % 2 === 0 ? 'white' : '#F8F8F8' }}>
+                      <td style={{ padding: '6px 8px', fontSize: '14px', fontWeight: 500 }}>
+                        {el.name || '—'}
+                      </td>
+                      <td style={{ padding: '6px 8px', textAlign: 'center', backgroundColor: j % 2 === 0 ? '#f8f9fa' : '#f1f5f9' }}>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: '13px', color: '#475569' }}>{entryEl?.condition || '—'}</span>
+                        {entryEl?.description && <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{entryEl.description}</div>}
+                      </td>
+                      <td style={{ padding: '6px 8px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <Select value={el.condition}
+                            onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
+                            <SelectTrigger className="w-full"><span className="text-sm">{el.condition}</span></SelectTrigger>
+                            <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                          </Select>
+                          <Input className="text-sm" placeholder="Commentaire..."
+                            value={el.comment}
+                            onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], comment: e.target.value }; return { ...r, elements: els } })} />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
             <Button type="button" variant="outline" size="sm" className="mt-3"
               onClick={() => updateRoom(idx, r => ({ ...r, elements: [...r.elements, { name: '', description: '', condition: 'A' as InspectionCondition, comment: '' }] }))}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un élément
             </Button>
           </div>
         ) : (
-          <div style={{ width: '100%', overflowX: 'hidden' }}>
-            <div className="grid gap-2 text-xs font-medium text-slate-500 px-1" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5% auto' }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Élément</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>État</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Description</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Commentaire</span>
-              <span />
-            </div>
-            {room.elements.map((el: any, j: number) => (
-              <div key={j} className="grid gap-2 items-center mt-1" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5% auto' }}>
-                <div style={{ overflow: 'hidden', minWidth: 0 }}>
-                  <Input className="text-xs w-full" value={el.name}
-                    onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], name: e.target.value }; return { ...r, elements: els } })} />
-                </div>
-                <div style={{ overflow: 'hidden', minWidth: 0 }}>
-                  <Select value={el.condition}
-                    onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
-                    <SelectTrigger className="w-full h-8"><span className="text-xs">{el.condition}</span></SelectTrigger>
-                    <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div style={{ overflow: 'hidden', minWidth: 0 }}>
-                  <Input className="text-xs w-full" placeholder="…"
-                    value={el.description}
-                    onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], description: e.target.value }; return { ...r, elements: els } })} />
-                </div>
-                <div style={{ overflow: 'hidden', minWidth: 0 }}>
-                  <Input className="text-xs w-full" placeholder="…"
-                    value={el.comment}
-                    onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], comment: e.target.value }; return { ...r, elements: els } })} />
-                </div>
-                <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-400"
-                  onClick={() => updateRoom(idx, r => ({ ...r, elements: r.elements.filter((_: any, k: number) => k !== j) }))}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            ))}
-          </div>
+          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+            <colgroup>
+              <col style={{ width: '20%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '35%' }} />
+              <col style={{ width: '30%' }} />
+              <col style={{ width: '5%' }} />
+            </colgroup>
+            <thead>
+              <tr style={{ backgroundColor: '#063B26', color: 'white' }}>
+                <th style={{ padding: '8px', textAlign: 'left', fontSize: '12px', fontWeight: 500 }}>Élément</th>
+                <th style={{ padding: '8px', textAlign: 'left', fontSize: '12px', fontWeight: 500 }}>État</th>
+                <th style={{ padding: '8px', textAlign: 'left', fontSize: '12px', fontWeight: 500 }}>Description</th>
+                <th style={{ padding: '8px', textAlign: 'left', fontSize: '12px', fontWeight: 500 }}>Commentaire</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {room.elements.map((el: any, j: number) => (
+                <tr key={j} style={{ backgroundColor: j % 2 === 0 ? 'white' : '#F8F8F8' }}>
+                  <td style={{ padding: '6px 8px' }}>
+                    <Input className="text-xs w-full" value={el.name}
+                      onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], name: e.target.value }; return { ...r, elements: els } })} />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <Select value={el.condition}
+                      onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
+                      <SelectTrigger className="w-full h-8"><span className="text-xs">{el.condition}</span></SelectTrigger>
+                      <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <Input className="text-xs w-full" placeholder="…" value={el.description}
+                      onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], description: e.target.value }; return { ...r, elements: els } })} />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <Input className="text-xs w-full" placeholder="…" value={el.comment}
+                      onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], comment: e.target.value }; return { ...r, elements: els } })} />
+                  </td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-400"
+                      onClick={() => updateRoom(idx, r => ({ ...r, elements: r.elements.filter((_: any, k: number) => k !== j) }))}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
 
         {!isComparison && (
