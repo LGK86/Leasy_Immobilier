@@ -72,9 +72,11 @@ export default async function SignTokenPage({
     allTenantIds = [doc.tenant_id]
   }
 
-  // Check if this specific tenant has already signed
-  const tenantSignatures: Record<string, string> = doc.content?.tenant_signatures ?? {}
-  if (tenantId && tenantSignatures[tenantId]) {
+  // Check if this specific tenant has already signed (array format)
+  const tenantSigsArr: Array<{ tenant_id: string; signature: string }> =
+    Array.isArray(doc.content?.tenant_signatures) ? doc.content.tenant_signatures : []
+  const alreadySigned = tenantId ? tenantSigsArr.some((s: any) => s.tenant_id === tenantId) : false
+  if (alreadySigned) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F6F4]">
         <div className="text-center max-w-md p-8">

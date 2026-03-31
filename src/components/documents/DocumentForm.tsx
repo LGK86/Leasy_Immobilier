@@ -98,9 +98,6 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
   const [loading, setLoading] = useState(false)
   const [docType, setDocType] = useState('lease')
   const [propertyId, setPropertyId] = useState('')
-  const [blockError, setBlockError] = useState<string | null>(null)
-  const [wizardPropertyId, setWizardPropertyId] = useState('')
-  const [checkingBlock, setCheckingBlock] = useState(false)
   const [tenantIds, setTenantIds] = useState<string[]>([])
   const [title, setTitle] = useState('Contrat de bail')
   const [fields, setFields] = useState(defaultFields['lease'])
@@ -132,38 +129,11 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
     const defaults = defaultFields[type] ?? []
     setFields(defaults)
     setValues({})
-    setBlockError(null)
-    setWizardPropertyId('')
     const label = docTypes.find(d => d.value === type)?.label ?? ''
     setTitle(label)
   }
 
-  const blockLabels: Record<string, string> = {
-    lease: 'bail',
-    entry_inspection: "état des lieux d'entrée",
-    inventory: 'inventaire',
-  }
-
-  const handleOpenWizard = async () => {
-    setBlockError(null)
-    const pid = wizardPropertyId
-    if (pid && docType !== 'exit_inspection') {
-      setCheckingBlock(true)
-      const { data: existing } = await supabase
-        .from('documents')
-        .select('id, content')
-        .eq('owner_id', userId)
-        .eq('property_id', pid)
-        .eq('type', docType)
-        .in('status', ['draft', 'sent', 'signed', 'pending_tenant_signature', 'finalized'])
-      setCheckingBlock(false)
-      const active = (existing ?? []).filter(d => !d.content?.closed_at)
-      if (active.length > 0) {
-        const lbl = blockLabels[docType] ?? 'document'
-        setBlockError(`Un ${lbl} actif existe déjà pour ce bien. Veuillez le clôturer avant d'en créer un nouveau.`)
-        return
-      }
-    }
+  const handleOpenWizard = () => {
     if (docType === 'lease') onSuccess()
     else onSuccess({ _wizardType: docType })
   }
@@ -303,34 +273,11 @@ export default function DocumentForm({ properties, tenants, userId, onSuccess }:
               : 'Ce document sera configuré étape par étape via un assistant dédié.'}
           </p>
 
-          {docType !== 'exit_inspection' && (
-            <div className="space-y-1">
-              <Label className="text-xs text-slate-500">Bien (optionnel — pour vérifier les doublons)</Label>
-              <Select value={wizardPropertyId || undefined} onValueChange={v => { setWizardPropertyId(v ?? ''); setBlockError(null) }}>
-                <SelectTrigger className="w-full">
-                  <TriggerLabel
-                    value={properties.find(p => p.id === wizardPropertyId) ? `${properties.find(p => p.id === wizardPropertyId)!.address}, ${properties.find(p => p.id === wizardPropertyId)!.city}` : undefined}
-                    placeholder="Sélectionner un bien"
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.address}, {p.city}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {blockError && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{blockError}</p>
-          )}
-
           <Button
             onClick={handleOpenWizard}
-            disabled={checkingBlock}
             className="w-full text-[#063B26] font-semibold"
             style={{ backgroundColor: '#CFFF92' }}
           >
-            {checkingBlock ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             {docType === 'lease' ? "Créer un contrat de bail" :
              docType === 'entry_inspection' ? "Créer un État des lieux d'entrée" :
              docType === 'exit_inspection' ? "Créer un État des lieux de sortie" :

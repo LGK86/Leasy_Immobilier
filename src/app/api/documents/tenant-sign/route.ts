@@ -25,8 +25,10 @@ export async function POST(req: Request) {
     .single()
 
   if (docErr || !doc) {
+    console.error('[tenant-sign] Token validation error:', { token: token?.slice(0, 8) + '...', tenantId, error: docErr?.message })
     return NextResponse.json({ error: 'Invalid token' }, { status: 404 })
   }
+  console.log('[tenant-sign] Document found:', { id: doc.id, type: doc.type, status: doc.status })
 
   if (doc.signing_token_expires_at && new Date(doc.signing_token_expires_at) < new Date()) {
     return NextResponse.json({ error: 'Token expired' }, { status: 410 })
@@ -83,6 +85,11 @@ export async function POST(req: Request) {
       .eq('id', doc.id)
 
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+
+    // Update all tenants to active status
+    if (allTenantIds.length > 0) {
+      await serviceClient.from('tenants').update({ status: 'active' }).in('id', allTenantIds)
+    }
 
     // Generate final PDF with both signatures and send to all tenants
     try {

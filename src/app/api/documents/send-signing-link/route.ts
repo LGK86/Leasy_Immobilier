@@ -78,7 +78,6 @@ export async function POST(req: Request) {
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
-  const propertyAddress = doc.property ? `${doc.property.address}, ${doc.property.city}` : ''
   const baseSigningUrl = `${process.env.NEXT_PUBLIC_APP_URL}/sign/${token}`
 
   // Send one email per tenant
@@ -98,7 +97,7 @@ export async function POST(req: Request) {
           <div style="padding: 32px; background: #ffffff; border: 1px solid #e5e7eb;">
             <p style="color: #374151; font-size: 16px;">Bonjour ${tenantName},</p>
             <p style="color: #374151;">Votre bailleur vous invite à signer le document suivant :</p>
-            <p style="color: #063B26; font-weight: bold; font-size: 18px;">${doc.title}${propertyAddress ? ` — ${propertyAddress}` : ''}</p>
+            <p style="color: #063B26; font-weight: bold; font-size: 18px;">${doc.title}</p>
             <p style="color: #6b7280; font-size: 14px;">Cliquez sur le bouton ci-dessous pour consulter et signer votre document en ligne :</p>
             <div style="text-align: center; margin: 32px 0;">
               <a href="${signingUrl}"
