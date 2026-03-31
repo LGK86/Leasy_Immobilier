@@ -42,12 +42,13 @@ export async function POST(request: NextRequest) {
     ? await supabase.from('tenants').select('id, first_name, last_name, email, phone').in('id', tenantIds)
     : { data: [] }
 
-  const tenantSignatures: Record<string, string> = doc.content?.tenant_signatures ?? {}
+  const tenantSigsArr: Array<{ tenant_id: string; signature: string }> =
+    Array.isArray(doc.content?.tenant_signatures) ? doc.content.tenant_signatures : []
   const tenants = (pdfTenants ?? []).map(t => ({
     name: `${t.first_name} ${t.last_name}`,
     email: t.email ?? undefined,
     phone: t.phone ?? undefined,
-    signature: tenantSignatures[t.id] ?? doc.tenant_signature ?? null,
+    signature: tenantSigsArr.find((s: any) => s.tenant_id === t.id)?.signature ?? doc.tenant_signature ?? null,
   }))
 
   const pdfData = {

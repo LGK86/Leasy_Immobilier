@@ -51,14 +51,21 @@ export async function POST(req: Request) {
   // Identify the signing tenant
   const signingTenantId: string = tenantId ?? doc.tenant_id
 
-  // Update tenant_signatures map
-  const currentSignatures: Record<string, string> = doc.content?.tenant_signatures ?? {}
-  const newSignatures = { ...currentSignatures, [signingTenantId]: signature }
+  // Update tenant_signatures array
+  const currentSigs: Array<{ tenant_id: string; signature: string; signed_at: string }> =
+    Array.isArray(doc.content?.tenant_signatures) ? [...doc.content.tenant_signatures] : []
+  if (!currentSigs.some((s: any) => s.tenant_id === signingTenantId)) {
+    currentSigs.push({
+      tenant_id: signingTenantId,
+      signature,
+      signed_at: new Date().toISOString().split('T')[0],
+    })
+  }
 
   // Check if all tenants have now signed
-  const allSigned = allTenantIds.length > 0 && allTenantIds.every(id => newSignatures[id])
+  const allSigned = allTenantIds.length > 0 && allTenantIds.every((id: string) => currentSigs.some((s: any) => s.tenant_id === id))
 
-  const updatedContent = { ...(doc.content ?? {}), tenant_signatures: newSignatures }
+  const updatedContent = { ...(doc.content ?? {}), tenant_signatures: currentSigs }
 
   if (allSigned) {
     // Finalize document
@@ -89,7 +96,7 @@ export async function POST(req: Request) {
 
       const tenants = (pdfTenants ?? []).map(t => ({
         name: `${t.first_name} ${t.last_name}`,
-        signature: newSignatures[t.id] ?? null,
+        signature: currentSigs.find((s: any) => s.tenant_id === t.id)?.signature ?? null,
       }))
 
       const pdfInput = {
@@ -199,7 +206,7 @@ export async function POST(req: Request) {
         .eq('id', signingTenantId)
         .single()
 
-      const signedCount = Object.keys(newSignatures).length
+      const signedCount = currentSigs.length
       const totalCount = allTenantIds.length
       const tenantFullName = signingTenantData
         ? `${signingTenantData.first_name} ${signingTenantData.last_name}`

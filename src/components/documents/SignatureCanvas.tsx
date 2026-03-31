@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button'
 interface SignatureCanvasProps {
   onSave: (dataUrl: string) => void
   existingSignature?: string | null
+  width?: number
+  height?: number
 }
 
-export default function SignatureCanvas({ onSave, existingSignature }: SignatureCanvasProps) {
+export default function SignatureCanvas({ onSave, existingSignature, width = 500, height = 150 }: SignatureCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [drawing, setDrawing] = useState(false)
   const [hasSig, setHasSig] = useState(false)
@@ -93,8 +95,8 @@ export default function SignatureCanvas({ onSave, existingSignature }: Signature
     <div className="space-y-3">
       <canvas
         ref={canvasRef}
-        width={500}
-        height={150}
+        width={width}
+        height={height}
         className="border border-slate-200 rounded-lg w-full cursor-crosshair touch-none"
         onMouseDown={startDrawing}
         onMouseMove={draw}

@@ -554,7 +554,7 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
   const HDR = 60
   page.drawRectangle({ x: 0, y: H - HDR, width: W, height: HDR, color: COL_GREEN })
   page.drawRectangle({ x: 0, y: H - HDR - 3, width: W, height: 3, color: COL_ACCENT })
-  page.drawText(isExit ? "ETAT DES LIEUX DE SORTIE" : "ETAT DES LIEUX D ENTREE", {
+  page.drawText(isExit ? "ETAT DES LIEUX DE SORTIE" : "ETAT DES LIEUX D'ENTREE", {
     x: M, y: H - 36, size: 16, font: HLVB, color: COL_WHITE,
   })
   page.drawText("Conforme a la loi ALUR", { x: M, y: H - 52, size: 9, font: HLV, color: COL_ACCENT })
@@ -674,12 +674,11 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
     const elements = Array.isArray(room.elements) ? room.elements : []
     if (elements.length > 0) {
       drawTable(
-        ['Element', 'Description / Commentaire', 'Etat'],
-        elements.map((el: any) => {
-          const desc = [sa(el.description ?? ''), sa(el.comment ?? '')].filter(Boolean).join(' / ')
-          return [el.name ?? '', desc, el.condition ?? '']
-        }),
-        [0.28, 0.57, 0.15]
+        ['Element', 'Etat', 'Description', 'Commentaire'],
+        elements.map((el: any) => [
+          el.name ?? '', el.condition ?? '', sa(el.description ?? ''), sa(el.comment ?? ''),
+        ]),
+        [0.20, 0.10, 0.35, 0.35]
       )
     } else {
       checkY(14); page.drawText('Aucun element renseigne.', { x: M + 10, y, size: 8.5, font: HLV, color: COL_LIGHT }); y -= 14
@@ -709,7 +708,7 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
   }
   y -= 8
 
-  const location = sa(c.location ?? data.propertyCity ?? '')
+  const location = sa(c.location || data.propertyCity || '')
   const copies = c.copies_count ?? 2
   checkY(14)
   page.drawText(
@@ -720,8 +719,7 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
 
   // Signatures
   const SBH = 80
-  const SBW = (CW - 20) / 2
-  checkY(SBH + 40)
+  const SBW = (CW - 10) / 2
 
   const drawSigBox = async (bx: number, by: number, label: string, subLabel: string, sigDataUrl?: string | null) => {
     page.drawText(sa(label),    { x: bx, y: by + SBH + 14, size: 9, font: HLVB, color: COL_MID })
@@ -739,8 +737,24 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
     }
   }
 
-  await drawSigBox(M,          y - SBH, 'Le(s) bailleur(s)',   'certifie(nt) exact', data.ownerSignature)
-  await drawSigBox(M + SBW + 20, y - SBH, 'Le(s) locataire(s)', 'certifie(nt) exact', data.tenants[0]?.signature ?? null)
+  const allSigBoxes: Array<{ label: string; sub: string; sig?: string | null }> = [
+    { label: 'Le(s) bailleur(s)', sub: 'certifie(nt) exact', sig: data.ownerSignature },
+    ...data.tenants.map((t, i) => ({
+      label: sa(t.name) || `Locataire ${i + 1}`,
+      sub: 'certifie(nt) exact',
+      sig: t.signature ?? null,
+    })),
+  ]
+
+  for (let i = 0; i < allSigBoxes.length; i += 2) {
+    checkY(SBH + 36)
+    const boxY = y - SBH
+    await drawSigBox(M, boxY, allSigBoxes[i].label, allSigBoxes[i].sub, allSigBoxes[i].sig)
+    if (i + 1 < allSigBoxes.length) {
+      await drawSigBox(M + SBW + 10, boxY, allSigBoxes[i + 1].label, allSigBoxes[i + 1].sub, allSigBoxes[i + 1].sig)
+    }
+    y -= SBH + 26
+  }
 
   addFooter()
   return pdfDoc.save()
@@ -886,7 +900,7 @@ export async function generateInventoryPDF(data: DocumentData): Promise<Uint8Arr
   }
   y -= 8
 
-  const location = sa(c.location ?? data.propertyCity ?? '')
+  const location = sa(c.location || data.propertyCity || '')
   const copies = c.copies_count ?? 2
   checkY(14)
   page.drawText(

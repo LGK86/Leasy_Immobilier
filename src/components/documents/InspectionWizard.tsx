@@ -988,11 +988,13 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
               </div>
             </>
           ) : (
-            <div className="border border-slate-200 rounded-lg p-3 max-w-[400px] mx-auto">
+            <div className="max-w-[420px] mx-auto border border-slate-200 rounded-lg p-3">
               <p className="text-xs text-slate-500 mb-2">Signez dans le cadre ci-dessous</p>
               <SignatureCanvas
                 onSave={(sig) => { setOwnerSig(sig); setSigSubStep('send') }}
                 existingSignature={ownerSig}
+                width={400}
+                height={150}
               />
             </div>
           )}
@@ -1073,14 +1075,14 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 max-w-2xl mx-auto">
       <ProgressBar current={sectionIndex} total={totalSec} label={sectionLabel} />
 
       <div className="min-h-[300px]">
         {renderSection()}
       </div>
 
-      <div className="flex justify-center items-center gap-3 pt-4 border-t flex-wrap">
+      <div className="flex justify-center items-center gap-4 pt-4 border-t mt-6">
         <Button type="button" variant="outline" size="sm"
           onClick={() => {
             if (isSigSec && sigSubStep === 'send') {
