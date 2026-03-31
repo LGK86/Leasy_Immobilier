@@ -91,3 +91,16 @@
 
 -- Valeurs valides pour InventoryCondition :
 --   'Neuf', 'Bon', 'Moyen', 'Tres abime'
+
+-- Clôture automatique lors de la finalisation d'un EDL de sortie :
+-- Quand un EDL de sortie est généré (POST /api/documents/generate) et que
+-- content.linked_inspection_id est renseigné, les actions suivantes sont
+-- effectuées automatiquement :
+--   1. L'EDL d'entrée lié passe à status='finalized' et content.closed_at est renseigné
+--   2. Le bail actif (status='signed') du bien passe à status='finalized' avec content.closed_at
+--   3. Le bien passe à status='vacant'
+--   4. Les locataires passent à status='inactive'
+-- Aucune contrainte de schéma supplémentaire n'est nécessaire :
+--   - documents.status contrainte actuelle : ('draft','sent','signed','pending_tenant_signature','finalized')
+--   - closed_at est stocké dans le JSONB content, pas en colonne dédiée
+--   - tenants.status='inactive' est déjà supporté

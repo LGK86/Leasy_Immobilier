@@ -132,7 +132,14 @@ export default function DocumentList({ documents, properties, tenants, userId }:
                       <TableCell className="font-medium">{doc.title}</TableCell>
                       <TableCell className="text-slate-500 text-sm">{typeLabels[doc.type as keyof typeof typeLabels]}</TableCell>
                       <TableCell className="text-slate-500 text-sm">{doc.property?.address}</TableCell>
-                      <TableCell className="text-slate-500 text-sm">{doc.tenant ? `${doc.tenant.first_name} ${doc.tenant.last_name}` : '—'}</TableCell>
+                      <TableCell className="text-slate-500 text-sm">
+                        {(() => {
+                          const ids: string[] = Array.isArray(doc.content?.tenant_ids) ? doc.content.tenant_ids : []
+                          const names = ids.map(id => tenants.find(t => t.id === id)).filter(Boolean).map(t => `${t!.first_name} ${t!.last_name}`)
+                          if (names.length > 0) return names.join(', ')
+                          return doc.tenant ? `${doc.tenant.first_name} ${doc.tenant.last_name}` : '—'
+                        })()}
+                      </TableCell>
                       <TableCell><Badge variant={sc.variant} className={sc.className}>{sc.label}</Badge></TableCell>
                       <TableCell className="text-slate-500 text-sm">
                         {format(new Date(doc.created_at), 'dd/MM/yyyy', { locale: fr })}

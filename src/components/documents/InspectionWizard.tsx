@@ -155,9 +155,14 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const entryInspections = allDocuments.filter(
     d => d.type === 'entry_inspection' && d.property_id === propertyId
   )
-  const availableEntryInspections = allDocuments.filter(
-    d => d.type === 'entry_inspection' && d.property_id === propertyId && d.status !== 'draft'
-  )
+  const exitDate = type === 'exit_inspection' ? (content as InspectionContent).inspection_date : ''
+  const availableEntryInspections = allDocuments.filter(d => {
+    if (d.type !== 'entry_inspection') return false
+    if (d.property_id !== propertyId) return false
+    if (d.status !== 'finalized') return false
+    if (!exitDate) return true
+    return new Date(d.content?.inspection_date) < new Date(exitDate)
+  })
 
   // ── Property selection with auto-fill ────────────────────────
   const handlePropertySelect = async (pid: string) => {
@@ -526,24 +531,14 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <LF label={isInventory ? "Date de l'inventaire *" : "Date de l'état des lieux *"}>
-            <Input
-              type="date"
-              value={isInventory ? vc.inventory_date : ic.inspection_date}
-              onChange={e => setField(isInventory ? 'inventory_date' : 'inspection_date', e.target.value)}
-              className="text-sm"
-            />
-          </LF>
-          <LF label="Nombre d'exemplaires">
-            <Input
-              type="number"
-              value={String(content.copies_count)}
-              onChange={e => setField('copies_count', parseInt(e.target.value) || 2)}
-              className="text-sm"
-            />
-          </LF>
-        </div>
+        <LF label={isInventory ? "Date de l'inventaire *" : "Date de l'état des lieux *"}>
+          <Input
+            type="date"
+            value={isInventory ? vc.inventory_date : ic.inspection_date}
+            onChange={e => setField(isInventory ? 'inventory_date' : 'inspection_date', e.target.value)}
+            className="text-sm"
+          />
+        </LF>
 
         {!isInventory && (
           <LF label="Description du logement">
@@ -644,43 +639,81 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
 
   // ─── Section 2 (inspection) — Accessoires ─────────────────────────────────
 
-  const renderAccessoriesSection = () => (
-    <div className="space-y-3">
-      <p className="text-sm font-medium text-slate-700">Accessoires et équipements</p>
-      <div className="space-y-2">
-        <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-500 px-1">
-          <span className="col-span-7">Accessoire</span>
-          <span className="col-span-4">État</span>
-          <span className="col-span-1" />
-        </div>
-        {ic.accessories.map((acc, i) => (
-          <div key={i} className="grid grid-cols-12 gap-2 items-center">
-            <Input className="col-span-7 text-sm" placeholder="Sonnette"
-              value={acc.name}
-              onChange={e => { const a = [...ic.accessories]; a[i] = { ...a[i], name: e.target.value }; setField('accessories', a) }}
-            />
-            <div className="col-span-4">
-              <Select value={acc.condition}
-                onValueChange={(v: string | null) => {
-                  const a = [...ic.accessories]; a[i] = { ...a[i], condition: (v ?? 'A') as InspectionCondition }; setField('accessories', a)
-                }}>
-                <SelectTrigger className="w-full"><span className="text-sm">{acc.condition}</span></SelectTrigger>
-                <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-              </Select>
+  const renderAccessoriesSection = () => {
+    const entryAccessories: any[] = linkedEntryInspection?.content?.accessories ?? []
+    const isComparison = !!linkedEntryInspection && type === 'exit_inspection'
+
+    if (isComparison) {
+      return (
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-slate-700">Accessoires et équipements</p>
+          <div className="overflow-x-hidden">
+            <div className="grid items-center mb-2 gap-2" style={{ gridTemplateColumns: '40% 20% 40%' }}>
+              <div className="text-xs font-medium text-slate-500">Accessoire</div>
+              <div className="text-xs font-medium text-slate-600 bg-slate-100 rounded px-1 py-0.5 text-center">Entrée</div>
+              <div className="text-xs font-medium text-white rounded px-1 py-0.5 text-center" style={{ backgroundColor: '#063B26' }}>Sortie</div>
             </div>
-            <Button type="button" variant="ghost" size="icon" className="col-span-1 h-8 w-8 text-red-400"
-              onClick={() => setField('accessories', ic.accessories.filter((_, j) => j !== i))}>
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            {ic.accessories.map((acc, i) => {
+              const entryAcc = entryAccessories.find((a: any) => a.name === acc.name) ?? entryAccessories[i]
+              return (
+                <div key={i} className="grid items-center gap-2 py-1.5 border-b border-slate-100" style={{ gridTemplateColumns: '40% 20% 40%' }}>
+                  <div className="text-sm text-slate-700">{acc.name || '—'}</div>
+                  <div className="bg-slate-50 border border-slate-100 rounded p-1.5 text-center">
+                    <span className="text-xs font-mono font-bold text-slate-600">{entryAcc?.condition ?? '—'}</span>
+                  </div>
+                  <Select value={acc.condition}
+                    onValueChange={(v: string | null) => {
+                      const a = [...ic.accessories]; a[i] = { ...a[i], condition: (v ?? 'A') as InspectionCondition }; setField('accessories', a)
+                    }}>
+                    <SelectTrigger className="w-full"><span className="text-sm">{acc.condition}</span></SelectTrigger>
+                    <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              )
+            })}
           </div>
-        ))}
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-slate-700">Accessoires et équipements</p>
+        <div className="space-y-2">
+          <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-500 px-1">
+            <span className="col-span-7">Accessoire</span>
+            <span className="col-span-4">État</span>
+            <span className="col-span-1" />
+          </div>
+          {ic.accessories.map((acc, i) => (
+            <div key={i} className="grid grid-cols-12 gap-2 items-center">
+              <Input className="col-span-7 text-sm" placeholder="Sonnette"
+                value={acc.name}
+                onChange={e => { const a = [...ic.accessories]; a[i] = { ...a[i], name: e.target.value }; setField('accessories', a) }}
+              />
+              <div className="col-span-4">
+                <Select value={acc.condition}
+                  onValueChange={(v: string | null) => {
+                    const a = [...ic.accessories]; a[i] = { ...a[i], condition: (v ?? 'A') as InspectionCondition }; setField('accessories', a)
+                  }}>
+                  <SelectTrigger className="w-full"><span className="text-sm">{acc.condition}</span></SelectTrigger>
+                  <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="col-span-1 h-8 w-8 text-red-400"
+                onClick={() => setField('accessories', ic.accessories.filter((_, j) => j !== i))}>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+        <Button type="button" variant="outline" size="sm"
+          onClick={() => setField('accessories', [...ic.accessories, { name: '', condition: 'A' as InspectionCondition }])}>
+          <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un accessoire
+        </Button>
       </div>
-      <Button type="button" variant="outline" size="sm"
-        onClick={() => setField('accessories', [...ic.accessories, { name: '', condition: 'A' as InspectionCondition }])}>
-        <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un accessoire
-      </Button>
-    </div>
-  )
+    )
+  }
 
   // ─── Section 3 (inspection) — Chauffage et compteurs ──────────────────────
 
@@ -801,56 +834,42 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
         </div>
 
         {isComparison ? (
-          <div className="space-y-2">
-            {/* Comparison header */}
-            <div className="grid gap-2 text-xs font-medium px-1" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5%' }}>
-              <span className="text-slate-500">Élément</span>
-              <span />
-              <span className="bg-slate-100 text-slate-600 rounded px-1 py-0.5 text-center">Entrée</span>
-              <span className="text-white rounded px-1 py-0.5 text-center" style={{ backgroundColor: '#063B26' }}>Sortie</span>
+          <div className="overflow-x-hidden">
+            {/* Header */}
+            <div className="grid items-center mb-2 gap-2" style={{ gridTemplateColumns: '20% 15% 65%' }}>
+              <div className="text-sm font-semibold text-gray-600">Élément</div>
+              <div className="text-sm font-semibold text-center text-gray-500 bg-gray-100 rounded px-2 py-1">Entrée</div>
+              <div className="text-sm font-semibold text-center text-white rounded px-2 py-1" style={{ backgroundColor: '#063B26' }}>Sortie</div>
             </div>
             {room.elements.map((el: any, j: number) => {
-              const entryEl = entryRoom?.elements?.[j]
+              const entryEl = entryRoom?.elements?.find((e: any) => e.name === el.name) ?? entryRoom?.elements?.[j]
               return (
-                <div key={j} className="grid gap-2 items-start" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5%' }}>
-                  {/* Element name */}
-                  <Input className="text-xs mt-1" value={el.name}
-                    onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], name: e.target.value }; return { ...r, elements: els } })} />
-                  {/* Spacer */}
-                  <span />
+                <div key={j} className="grid items-start gap-2 py-2 border-b border-gray-100" style={{ gridTemplateColumns: '20% 15% 65%' }}>
+                  {/* Element name — fixed */}
+                  <div className="text-sm font-medium pt-2">{el.name || '—'}</div>
                   {/* Entry — read-only */}
-                  <div className="bg-slate-50 border border-slate-100 rounded p-1.5 text-xs text-slate-500 space-y-0.5 min-h-[2rem]">
-                    {entryEl ? (
-                      <>
-                        <div className="font-medium text-slate-600">{entryEl.condition}</div>
-                        {entryEl.description && <div>{entryEl.description}</div>}
-                        {entryEl.comment && <div className="text-slate-400 italic">{entryEl.comment}</div>}
-                      </>
-                    ) : (
-                      <span className="text-slate-300">—</span>
-                    )}
+                  <div className="flex flex-col gap-1 bg-gray-50 rounded p-2 text-sm text-gray-500">
+                    <span className="font-mono font-bold">{entryEl?.condition || '—'}</span>
+                    {entryEl?.description && <span className="text-xs">{entryEl.description}</span>}
                   </div>
-                  {/* Exit — editable */}
-                  <div className="space-y-1">
+                  {/* Exit — état + commentaire only */}
+                  <div className="flex flex-col gap-2">
                     <Select value={el.condition}
                       onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
-                      <SelectTrigger className="w-full h-7"><span className="text-xs">{el.condition}</span></SelectTrigger>
+                      <SelectTrigger className="w-full"><span className="text-sm">{el.condition}</span></SelectTrigger>
                       <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                     </Select>
-                    <Input className="text-xs" placeholder="Description"
-                      value={el.description}
-                      onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], description: e.target.value }; return { ...r, elements: els } })} />
-                    <Input className="text-xs" placeholder="Commentaire"
+                    <Input className="text-sm" placeholder="Commentaire..."
                       value={el.comment}
                       onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], comment: e.target.value }; return { ...r, elements: els } })} />
-                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-400"
-                      onClick={() => updateRoom(idx, r => ({ ...r, elements: r.elements.filter((_: any, k: number) => k !== j) }))}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
                   </div>
                 </div>
               )
             })}
+            <Button type="button" variant="outline" size="sm" className="mt-3"
+              onClick={() => updateRoom(idx, r => ({ ...r, elements: [...r.elements, { name: '', description: '', condition: 'A' as InspectionCondition, comment: '' }] }))}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un élément
+            </Button>
           </div>
         ) : (
           <div className="space-y-2">
@@ -885,10 +904,12 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
           </div>
         )}
 
-        <Button type="button" variant="outline" size="sm"
-          onClick={() => updateRoom(idx, r => ({ ...r, elements: [...r.elements, { name: '', description: '', condition: 'A' as InspectionCondition, comment: '' }] }))}>
-          <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un élément
-        </Button>
+        {!isComparison && (
+          <Button type="button" variant="outline" size="sm"
+            onClick={() => updateRoom(idx, r => ({ ...r, elements: [...r.elements, { name: '', description: '', condition: 'A' as InspectionCondition, comment: '' }] }))}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter un élément
+          </Button>
+        )}
 
         <LF label="Observations de la pièce">
           <Textarea value={room.remarks} rows={2} className="text-sm resize-none"

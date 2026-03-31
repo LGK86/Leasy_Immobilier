@@ -101,6 +101,41 @@ export async function POST(request: NextRequest) {
 
   await supabase.from('documents').update(updates).eq('id', documentId)
 
+  // Auto-close when an exit inspection is finalized
+  if (doc.type === 'exit_inspection' && doc.content?.linked_inspection_id) {
+    const linkedId = doc.content.linked_inspection_id as string
+    const closedAt = new Date().toISOString()
+
+    // Fetch entry inspection to preserve its content
+    const { data: entryDoc } = await supabase
+      .from('documents').select('content').eq('id', linkedId).single()
+    if (entryDoc) {
+      await supabase.from('documents')
+        .update({ status: 'finalized', content: { ...entryDoc.content, closed_at: closedAt }, updated_at: closedAt })
+        .eq('id', linkedId)
+    }
+
+    // Close active lease for the property
+    if (doc.property_id) {
+      const { data: leaseDoc } = await supabase
+        .from('documents').select('id, content')
+        .eq('property_id', doc.property_id).eq('type', 'lease').eq('status', 'signed')
+        .maybeSingle()
+      if (leaseDoc) {
+        await supabase.from('documents')
+          .update({ status: 'finalized', content: { ...leaseDoc.content, closed_at: closedAt }, updated_at: closedAt })
+          .eq('id', leaseDoc.id)
+      }
+
+      await supabase.from('properties').update({ status: 'vacant', updated_at: closedAt }).eq('id', doc.property_id)
+    }
+
+    // Set tenants inactive
+    if (tenantIds.length > 0) {
+      await supabase.from('tenants').update({ status: 'inactive', updated_at: closedAt }).in('id', tenantIds)
+    }
+  }
+
   if (sendEmail && process.env.RESEND_API_KEY) {
     // Determine all tenant IDs (multi-tenant support)
     let tenantIds: string[] = []
