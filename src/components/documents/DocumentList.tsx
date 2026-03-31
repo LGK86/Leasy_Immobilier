@@ -205,34 +205,48 @@ export default function DocumentList({ documents, properties, tenants, userId }:
 
       {openDetail && (
         <Dialog open={!!openDetail} onOpenChange={() => setOpenDetail(null)}>
-          <DialogContent className="w-[55vw] max-w-[55vw] sm:max-w-[55vw] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{openDetail.title}</DialogTitle>
-            </DialogHeader>
-            <DocumentDetail
-              document={openDetail}
-              onSigned={() => { setOpenDetail(null); router.refresh() }}
-              properties={properties}
-              tenants={tenants}
-              userId={userId}
-            />
+          <DialogContent
+            className="p-0 gap-0 overflow-hidden"
+            style={{ width: '55vw', height: '90vh', maxWidth: '55vw', maxHeight: '90vh', minWidth: '55vw', minHeight: '90vh' }}
+          >
+            <div className="flex flex-col h-full overflow-hidden">
+              <div className="flex-shrink-0 px-6 pt-5 pb-4 border-b">
+                <DialogTitle className="text-base font-semibold">{openDetail.title}</DialogTitle>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <DocumentDetail
+                  document={openDetail}
+                  onSigned={() => { setOpenDetail(null); router.refresh() }}
+                  properties={properties}
+                  tenants={tenants}
+                  userId={userId}
+                />
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       )}
 
       {openLeaseCreation && (
         <Dialog open={openLeaseCreation} onOpenChange={v => { if (!v) { setOpenLeaseCreation(false); router.refresh() } }}>
-          <DialogContent className="w-[55vw] max-w-[55vw] sm:max-w-[55vw] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Nouveau contrat de bail</DialogTitle>
-            </DialogHeader>
-            <DocumentDetail
-              document={null}
-              onSigned={() => { setOpenLeaseCreation(false); router.refresh() }}
-              properties={properties}
-              tenants={tenants}
-              userId={userId}
-            />
+          <DialogContent
+            className="p-0 gap-0 overflow-hidden"
+            style={{ width: '55vw', height: '90vh', maxWidth: '55vw', maxHeight: '90vh', minWidth: '55vw', minHeight: '90vh' }}
+          >
+            <div className="flex flex-col h-full overflow-hidden">
+              <div className="flex-shrink-0 px-6 pt-5 pb-4 border-b">
+                <DialogTitle className="text-base font-semibold">Nouveau contrat de bail</DialogTitle>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <DocumentDetail
+                  document={null}
+                  onSigned={() => { setOpenLeaseCreation(false); router.refresh() }}
+                  properties={properties}
+                  tenants={tenants}
+                  userId={userId}
+                />
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       )}
@@ -242,18 +256,25 @@ export default function DocumentList({ documents, properties, tenants, userId }:
           open={!!openInspectionCreation}
           onOpenChange={v => { if (!v) { setOpenInspectionCreation(null); router.refresh() } }}
         >
-          <DialogContent className="w-[55vw] max-w-[55vw] sm:max-w-[55vw] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{typeLabels[openInspectionCreation.type as keyof typeof typeLabels]}</DialogTitle>
-            </DialogHeader>
-            <InspectionWizard
-              type={openInspectionCreation.type}
-              properties={properties}
-              tenants={tenants}
-              userId={userId}
-              allDocuments={documents}
-              onClose={() => { setOpenInspectionCreation(null); router.refresh() }}
-            />
+          <DialogContent
+            className="p-0 gap-0 overflow-hidden"
+            style={{ width: '55vw', height: '90vh', maxWidth: '55vw', maxHeight: '90vh', minWidth: '55vw', minHeight: '90vh' }}
+          >
+            <div className="flex flex-col h-full overflow-hidden">
+              <div className="flex-shrink-0 px-6 pt-5 pb-4 border-b">
+                <DialogTitle className="text-base font-semibold">{typeLabels[openInspectionCreation.type as keyof typeof typeLabels]}</DialogTitle>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <InspectionWizard
+                  type={openInspectionCreation.type}
+                  properties={properties}
+                  tenants={tenants}
+                  userId={userId}
+                  allDocuments={documents}
+                  onClose={() => { setOpenInspectionCreation(null); router.refresh() }}
+                />
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       )}

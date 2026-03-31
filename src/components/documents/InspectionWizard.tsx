@@ -1075,16 +1075,20 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col max-w-2xl mx-auto">
-      <div className="pb-3">
+    <div className="flex flex-col h-full overflow-hidden">
+
+      {/* Fixed sub-header: progress bar */}
+      <div className="flex-shrink-0 px-6 pt-3 pb-3 border-b bg-white">
         <ProgressBar current={sectionIndex} total={totalSec} label={sectionLabel} />
       </div>
 
-      <div className="pb-4">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-6 py-4">
         {renderSection()}
       </div>
 
-      <div className="sticky bottom-0 bg-white border-t pt-4 pb-2 flex justify-center items-center gap-4">
+      {/* Fixed footer: nav buttons */}
+      <div className="flex-shrink-0 flex justify-center items-center gap-4 px-6 py-4 border-t bg-white">
         <Button type="button" variant="outline" size="sm"
           onClick={() => {
             if (isSigSec && sigSubStep === 'send') {

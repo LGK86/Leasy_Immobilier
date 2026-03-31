@@ -199,16 +199,21 @@ export default function DocumentDetail({ document: doc, onSigned, properties, te
 
   /* ── Render ──────────────────────────────────────────────── */
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      {docState && (
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-slate-500">{typeLabels[docState.type as keyof typeof typeLabels]}</span>
-          <Badge variant={sc?.color ?? 'secondary'}>{sc?.label ?? docState.status}</Badge>
-        </div>
-      )}
+    <div className="flex flex-col h-full overflow-hidden">
 
-      <StepIndicator current={step} />
+      {/* Fixed sub-header: status badge + step indicator */}
+      <div className="flex-shrink-0 px-6 pt-3 pb-3 border-b bg-white">
+        {docState && (
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-sm text-slate-500">{typeLabels[docState.type as keyof typeof typeLabels]}</span>
+            <Badge variant={sc?.color ?? 'secondary'}>{sc?.label ?? docState.status}</Badge>
+          </div>
+        )}
+        <StepIndicator current={step} />
+      </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-6 py-4">
 
       {/* ── STEP 1 : Wizard ──────────────────────────────────── */}
       {step === 1 && (
@@ -328,6 +333,8 @@ export default function DocumentDetail({ document: doc, onSigned, properties, te
           </button>
         </div>
       )}
+
+      </div>{/* end scrollable content */}
     </div>
   )
 }
