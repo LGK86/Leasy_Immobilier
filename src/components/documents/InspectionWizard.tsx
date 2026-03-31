@@ -126,6 +126,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const [ownerSig,            setOwnerSig]            = useState<string | null>(null)
   const [linkEntryInspection, setLinkEntryInspection] = useState(false)
   const [linkedEntryId,       setLinkedEntryId]       = useState('')
+  const [linkedEntryInspection, setLinkedEntryInspection] = useState<any>(null)
   const [localTenants,        setLocalTenants]        = useState<Tenant[]>(tenants)
   const [showNewTenant,       setShowNewTenant]       = useState(false)
   const [newTenantForm,       setNewTenantForm]       = useState({ first_name: '', last_name: '', email: '', phone: '' })
@@ -373,6 +374,78 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
           </Select>
         </LF>
 
+        {type === 'exit_inspection' && (
+          <div className="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="link_entry_inspection"
+                checked={linkEntryInspection}
+                onChange={e => {
+                  setLinkEntryInspection(e.target.checked)
+                  if (!e.target.checked) {
+                    setLinkedEntryId('')
+                    setLinkedEntryInspection(null)
+                    setField('linked_inspection_id', null)
+                  }
+                }}
+                className="h-4 w-4 accent-[#063B26]"
+              />
+              <label htmlFor="link_entry_inspection" className="text-sm text-slate-700 cursor-pointer">
+                Clôturer un état des lieux d&apos;entrée existant ?
+              </label>
+            </div>
+            {linkEntryInspection && (
+              <LF label="Sélectionner l'état des lieux d'entrée">
+                <Select
+                  value={linkedEntryId || undefined}
+                  onValueChange={(v: string | null) => {
+                    const id = v ?? ''
+                    setLinkedEntryId(id)
+                    setField('linked_inspection_id', id || null)
+                    if (id) {
+                      const entryDoc = allDocuments.find(d => d.id === id)
+                      setLinkedEntryInspection(entryDoc ?? null)
+                      if (entryDoc?.content) {
+                        const ec = entryDoc.content as InspectionContent
+                        setContent(prev => ({
+                          ...prev,
+                          rooms:       JSON.parse(JSON.stringify(ec.rooms       ?? [])),
+                          accessories: JSON.parse(JSON.stringify(ec.accessories ?? [])),
+                          heating:     { ...ec.heating },
+                          meters:      JSON.parse(JSON.stringify(ec.meters      ?? [])),
+                          access_keys: JSON.parse(JSON.stringify(ec.access_keys ?? [])),
+                        } as InspectionContent))
+                        if (Array.isArray(ec.tenant_ids) && ec.tenant_ids.length > 0) {
+                          setTenantIds(ec.tenant_ids)
+                        }
+                        if (ec.description) setField('description', ec.description)
+                        if (ec.surface != null) setSurface(String(ec.surface))
+                        if (ec.rooms_count != null) setRoomsCount(String(ec.rooms_count))
+                      }
+                    } else {
+                      setLinkedEntryInspection(null)
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <span className="flex-1 text-left truncate text-sm">
+                      {linkedEntryId
+                        ? availableEntryInspections.find(d => d.id === linkedEntryId)?.title ?? 'Sélectionné'
+                        : <span className="text-muted-foreground">Choisir un état des lieux d&apos;entrée</span>}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableEntryInspections.length === 0
+                      ? <SelectItem value="_none" disabled>Aucun état des lieux finalisé pour ce bien</SelectItem>
+                      : availableEntryInspections.map(d => <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </LF>
+            )}
+          </div>
+        )}
+
         <div className="space-y-2">
           <label className="text-xs font-medium text-slate-500">Locataire(s) *</label>
 
@@ -503,68 +576,6 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
               </SelectContent>
             </Select>
           </LF>
-        )}
-
-        {type === 'exit_inspection' && (
-          <div className="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="link_entry_inspection"
-                checked={linkEntryInspection}
-                onChange={e => {
-                  setLinkEntryInspection(e.target.checked)
-                  if (!e.target.checked) {
-                    setLinkedEntryId('')
-                    setField('linked_inspection_id', null)
-                  }
-                }}
-                className="h-4 w-4 accent-[#063B26]"
-              />
-              <label htmlFor="link_entry_inspection" className="text-sm text-slate-700 cursor-pointer">
-                Clôturer un état des lieux d&apos;entrée existant ?
-              </label>
-            </div>
-            {linkEntryInspection && (
-              <LF label="Sélectionner l'état des lieux d'entrée">
-                <Select
-                  value={linkedEntryId || undefined}
-                  onValueChange={(v: string | null) => {
-                    const id = v ?? ''
-                    setLinkedEntryId(id)
-                    setField('linked_inspection_id', id || null)
-                    if (id) {
-                      const entryDoc = allDocuments.find(d => d.id === id)
-                      if (entryDoc?.content) {
-                        const ec = entryDoc.content as InspectionContent
-                        setContent(prev => ({
-                          ...prev,
-                          rooms:       JSON.parse(JSON.stringify(ec.rooms       ?? [])),
-                          accessories: JSON.parse(JSON.stringify(ec.accessories ?? [])),
-                          heating:     { ...ec.heating },
-                          meters:      JSON.parse(JSON.stringify(ec.meters      ?? [])),
-                          access_keys: JSON.parse(JSON.stringify(ec.access_keys ?? [])),
-                        } as InspectionContent))
-                      }
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <span className="flex-1 text-left truncate text-sm">
-                      {linkedEntryId
-                        ? availableEntryInspections.find(d => d.id === linkedEntryId)?.title ?? 'Sélectionné'
-                        : <span className="text-muted-foreground">Choisir un état des lieux d&apos;entrée</span>}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableEntryInspections.length === 0
-                      ? <SelectItem value="_none" disabled>Aucun état des lieux finalisé pour ce bien</SelectItem>
-                      : availableEntryInspections.map(d => <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </LF>
-            )}
-          </div>
         )}
 
         <div className="grid grid-cols-2 gap-3">
@@ -773,6 +784,8 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const renderInspectionRoomSection = (idx: number) => {
     const room = ic.rooms[idx]
     if (!room) return null
+    const entryRoom = linkedEntryInspection?.content?.rooms?.[idx]
+    const isComparison = !!linkedEntryInspection && type === 'exit_inspection'
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-3">
@@ -787,36 +800,90 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
           )}
         </div>
 
-        <div className="space-y-2">
-          <div className="grid gap-2 text-xs font-medium text-slate-500 px-1" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5% auto' }}>
-            <span>Élément</span>
-            <span>État</span>
-            <span>Description</span>
-            <span>Commentaire</span>
-            <span />
-          </div>
-          {room.elements.map((el: any, j: number) => (
-            <div key={j} className="grid gap-2 items-center" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5% auto' }}>
-              <Input className="text-xs" value={el.name}
-                onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], name: e.target.value }; return { ...r, elements: els } })} />
-              <Select value={el.condition}
-                onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
-                <SelectTrigger className="w-full h-8"><span className="text-xs">{el.condition}</span></SelectTrigger>
-                <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-              </Select>
-              <Input className="text-xs" placeholder="…"
-                value={el.description}
-                onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], description: e.target.value }; return { ...r, elements: els } })} />
-              <Input className="text-xs" placeholder="…"
-                value={el.comment}
-                onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], comment: e.target.value }; return { ...r, elements: els } })} />
-              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-400"
-                onClick={() => updateRoom(idx, r => ({ ...r, elements: r.elements.filter((_: any, k: number) => k !== j) }))}>
-                <Trash2 className="h-3 w-3" />
-              </Button>
+        {isComparison ? (
+          <div className="space-y-2">
+            {/* Comparison header */}
+            <div className="grid gap-2 text-xs font-medium px-1" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5%' }}>
+              <span className="text-slate-500">Élément</span>
+              <span />
+              <span className="bg-slate-100 text-slate-600 rounded px-1 py-0.5 text-center">Entrée</span>
+              <span className="text-white rounded px-1 py-0.5 text-center" style={{ backgroundColor: '#063B26' }}>Sortie</span>
             </div>
-          ))}
-        </div>
+            {room.elements.map((el: any, j: number) => {
+              const entryEl = entryRoom?.elements?.[j]
+              return (
+                <div key={j} className="grid gap-2 items-start" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5%' }}>
+                  {/* Element name */}
+                  <Input className="text-xs mt-1" value={el.name}
+                    onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], name: e.target.value }; return { ...r, elements: els } })} />
+                  {/* Spacer */}
+                  <span />
+                  {/* Entry — read-only */}
+                  <div className="bg-slate-50 border border-slate-100 rounded p-1.5 text-xs text-slate-500 space-y-0.5 min-h-[2rem]">
+                    {entryEl ? (
+                      <>
+                        <div className="font-medium text-slate-600">{entryEl.condition}</div>
+                        {entryEl.description && <div>{entryEl.description}</div>}
+                        {entryEl.comment && <div className="text-slate-400 italic">{entryEl.comment}</div>}
+                      </>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </div>
+                  {/* Exit — editable */}
+                  <div className="space-y-1">
+                    <Select value={el.condition}
+                      onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
+                      <SelectTrigger className="w-full h-7"><span className="text-xs">{el.condition}</span></SelectTrigger>
+                      <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Input className="text-xs" placeholder="Description"
+                      value={el.description}
+                      onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], description: e.target.value }; return { ...r, elements: els } })} />
+                    <Input className="text-xs" placeholder="Commentaire"
+                      value={el.comment}
+                      onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], comment: e.target.value }; return { ...r, elements: els } })} />
+                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-400"
+                      onClick={() => updateRoom(idx, r => ({ ...r, elements: r.elements.filter((_: any, k: number) => k !== j) }))}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="grid gap-2 text-xs font-medium text-slate-500 px-1" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5% auto' }}>
+              <span>Élément</span>
+              <span>État</span>
+              <span>Description</span>
+              <span>Commentaire</span>
+              <span />
+            </div>
+            {room.elements.map((el: any, j: number) => (
+              <div key={j} className="grid gap-2 items-center" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5% auto' }}>
+                <Input className="text-xs" value={el.name}
+                  onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], name: e.target.value }; return { ...r, elements: els } })} />
+                <Select value={el.condition}
+                  onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
+                  <SelectTrigger className="w-full h-8"><span className="text-xs">{el.condition}</span></SelectTrigger>
+                  <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input className="text-xs" placeholder="…"
+                  value={el.description}
+                  onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], description: e.target.value }; return { ...r, elements: els } })} />
+                <Input className="text-xs" placeholder="…"
+                  value={el.comment}
+                  onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], comment: e.target.value }; return { ...r, elements: els } })} />
+                <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-400"
+                  onClick={() => updateRoom(idx, r => ({ ...r, elements: r.elements.filter((_: any, k: number) => k !== j) }))}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
 
         <Button type="button" variant="outline" size="sm"
           onClick={() => updateRoom(idx, r => ({ ...r, elements: [...r.elements, { name: '', description: '', condition: 'A' as InspectionCondition, comment: '' }] }))}>
