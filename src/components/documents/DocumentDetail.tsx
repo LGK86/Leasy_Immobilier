@@ -214,20 +214,22 @@ export default function DocumentDetail({ document: doc, onSigned, properties, te
         <StepIndicator current={step} />
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-
-      {/* ── STEP 1 : Wizard ──────────────────────────────────── */}
+      {/* Step 1: wizard controls its own scroll/footer layout */}
       {step === 1 && (
-        <DocumentWizard
-          doc={docState}
-          onSave={handleSaveContent}
-          onDocCreated={handleDocCreated}
-          properties={properties}
-          tenants={tenants}
-          userId={userId}
-        />
+        <div className="flex-1 overflow-hidden">
+          <DocumentWizard
+            doc={docState}
+            onSave={handleSaveContent}
+            onDocCreated={handleDocCreated}
+            properties={properties}
+            tenants={tenants}
+            userId={userId}
+          />
+        </div>
       )}
+
+      {/* Steps 2-3: scrollable content */}
+      <div className={step !== 1 ? 'flex-1 overflow-y-auto px-6 py-4' : 'hidden'}>
 
       {/* ── STEP 2 : Signature ───────────────────────────────── */}
       {step === 2 && (

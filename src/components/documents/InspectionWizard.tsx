@@ -201,10 +201,14 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   useEffect(() => {
     if (type !== 'entry_inspection') return
     if (tenantIds.length === 0) return
+    console.log('[InspectionWizard] tenantIds changed:', tenantIds)
+    console.log('[InspectionWizard] localTenants available:', localTenants.map(t => ({ id: t.id, entry_date: t.entry_date })))
+    const firstTenant = localTenants.find(t => tenantIds.includes(t.id))
+    console.log('[InspectionWizard] firstTenant found:', firstTenant)
+    console.log('[InspectionWizard] entry_date:', firstTenant?.entry_date)
     setContent(prev => {
       const ic = prev as InspectionContent
       if (ic.inspection_date) return prev
-      const firstTenant = localTenants.find(t => tenantIds.includes(t.id))
       if (!firstTenant?.entry_date) return prev
       return { ...prev, inspection_date: firstTenant.entry_date } as InspectionContent
     })

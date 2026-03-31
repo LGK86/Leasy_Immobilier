@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { generateDocumentPDF, generateInspectionPDF, generateInventoryPDF } from '@/lib/pdf/document'
+import { closeExitInspection } from '@/lib/documents/close-exit-inspection'
 
 export async function POST(req: Request) {
   const resend = new Resend(process.env.RESEND_API_KEY)
@@ -102,6 +103,12 @@ export async function POST(req: Request) {
       }
     } else {
       console.warn('[tenant-sign] No tenant IDs resolved — tenant status not updated')
+    }
+
+    // Auto-close property/lease/entry inspection for exit inspections
+    if (doc.type === 'exit_inspection') {
+      const docWithUpdatedContent = { ...doc, content: updatedContent }
+      await closeExitInspection(serviceClient, docWithUpdatedContent, doc.owner_id)
     }
 
     // Generate final PDF with both signatures and send to all tenants

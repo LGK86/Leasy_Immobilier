@@ -362,6 +362,9 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
       .select('monthly_rent, charges, deposit, surface, rooms_count')
       .eq('id', id)
       .single()
+    console.log('[DocumentWizard] Property selected:', id)
+    console.log('[DocumentWizard] Property data:', data)
+    console.log('[DocumentWizard] surface:', data?.surface, '/ rooms_count:', data?.rooms_count)
     if (data) {
       setForm(prev => ({
         ...prev,
@@ -1035,11 +1038,13 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
   else                                                                         sectionContent = renderGeneric()
 
   return (
-    <div className="space-y-2">
-      <Progress />
-      <div>
-        <h3 className="font-semibold text-slate-700 mb-4">{sections[section - 1]}</h3>
-        {sectionContent}
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        <Progress />
+        <div>
+          <h3 className="font-semibold text-slate-700 mb-4">{sections[section - 1]}</h3>
+          {sectionContent}
+        </div>
       </div>
       <Nav />
     </div>

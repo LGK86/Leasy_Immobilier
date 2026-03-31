@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateDocumentPDF, generateInspectionPDF, generateInventoryPDF } from '@/lib/pdf/document'
+import { closeExitInspection } from '@/lib/documents/close-exit-inspection'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -113,79 +114,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Auto-close when an exit inspection is generated
+  // Auto-close when an exit inspection is generated/finalized
   if (doc.type === 'exit_inspection') {
-    const closedAt = new Date().toISOString()
-    console.log('=== CLOSING EXIT INSPECTION ===')
-    console.log('Property ID:', doc.property_id)
-    console.log('Linked inspection ID:', doc.content?.linked_inspection_id)
-    console.log('Tenant IDs:', tenantIds)
-
-    // 1. Property → vacant
-    if (doc.property_id) {
-      const { error: propError } = await supabase
-        .from('properties')
-        .update({ status: 'vacant', updated_at: closedAt })
-        .eq('id', doc.property_id)
-        .eq('owner_id', user.id)
-      console.log('Property update error:', propError)
-      if (!propError) console.log('[generate] Property set to vacant:', doc.property_id)
-    }
-
-    // 2. Tenants → inactive
-    if (tenantIds.length > 0) {
-      const { error: tenantError } = await supabase
-        .from('tenants')
-        .update({ status: 'inactive', updated_at: closedAt })
-        .in('id', tenantIds)
-        .eq('owner_id', user.id)
-      console.log('Tenant update error:', tenantError)
-      if (!tenantError) console.log('[generate] Tenants set to inactive:', tenantIds)
-    }
-
-    // 3. Entry inspection → finalized + closed_at
-    if (doc.content?.linked_inspection_id) {
-      const { data: entryDoc, error: entryFetchErr } = await supabase
-        .from('documents')
-        .select('id, content')
-        .eq('id', doc.content.linked_inspection_id)
-        .eq('owner_id', user.id)
-        .single()
-      console.log('Entry inspection fetch error:', entryFetchErr)
-      if (entryDoc) {
-        const { error: entryError } = await supabase
-          .from('documents')
-          .update({ status: 'finalized', content: { ...entryDoc.content, closed_at: closedAt }, updated_at: closedAt })
-          .eq('id', doc.content.linked_inspection_id)
-          .eq('owner_id', user.id)
-        console.log('Entry inspection close error:', entryError)
-        if (!entryError) console.log('[generate] Entry inspection closed:', doc.content.linked_inspection_id)
-      }
-    }
-
-    // 4. Active lease → finalized + closed_at
-    if (doc.property_id) {
-      const { data: leaseDoc, error: leaseFetchErr } = await supabase
-        .from('documents')
-        .select('id, content')
-        .eq('property_id', doc.property_id)
-        .eq('type', 'lease')
-        .eq('owner_id', user.id)
-        .in('status', ['signed', 'pending_tenant_signature', 'finalized'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      console.log('Lease fetch error:', leaseFetchErr)
-      if (leaseDoc) {
-        const { error: leaseError } = await supabase
-          .from('documents')
-          .update({ status: 'finalized', content: { ...leaseDoc.content, closed_at: closedAt }, updated_at: closedAt })
-          .eq('id', leaseDoc.id)
-          .eq('owner_id', user.id)
-        console.log('Lease close error:', leaseError)
-        if (!leaseError) console.log('[generate] Lease closed:', leaseDoc.id)
-      }
-    }
+    await closeExitInspection(supabase, doc, user.id)
   }
 
   if (sendEmail && process.env.RESEND_API_KEY) {

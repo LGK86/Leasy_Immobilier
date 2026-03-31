@@ -13,8 +13,8 @@ export default async function DocumentsPage() {
       .select('*, property:properties(address, city), tenant:tenants(first_name, last_name)')
       .eq('owner_id', user.id)
       .order('created_at', { ascending: false }),
-    supabase.from('properties').select('id, address, city').eq('owner_id', user.id),
-    supabase.from('tenants').select('id, first_name, last_name, property_id, email, phone').eq('owner_id', user.id),
+    supabase.from('properties').select('id, address, city, surface, rooms_count').eq('owner_id', user.id),
+    supabase.from('tenants').select('id, first_name, last_name, property_id, email, phone, entry_date').eq('owner_id', user.id),
   ])
 
   return (
