@@ -103,4 +103,9 @@
 -- Aucune contrainte de schéma supplémentaire n'est nécessaire :
 --   - documents.status contrainte actuelle : ('draft','sent','signed','pending_tenant_signature','finalized')
 --   - closed_at est stocké dans le JSONB content, pas en colonne dédiée
---   - tenants.status='inactive' est déjà supporté
+
+-- Migration : Extension de la contrainte tenants.status
+-- Exécuter sur Supabase (SQL Editor) :
+alter table public.tenants drop constraint if exists tenants_status_check;
+alter table public.tenants add constraint tenants_status_check
+  check (status in ('active', 'inactive', 'draft', 'upcoming', 'pending_signature', 'lease_signed'));

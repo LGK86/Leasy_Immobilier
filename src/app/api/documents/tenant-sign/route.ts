@@ -87,8 +87,21 @@ export async function POST(req: Request) {
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
     // Update all tenants to active status
+    console.log('[tenant-sign] All signed. Updating tenant status.')
+    console.log('[tenant-sign] Document type:', doc.type)
+    console.log('[tenant-sign] content.tenant_ids:', doc.content?.tenant_ids)
+    console.log('[tenant-sign] document.tenant_id:', doc.tenant_id)
+    console.log('[tenant-sign] allTenantIds resolved:', allTenantIds)
     if (allTenantIds.length > 0) {
-      await serviceClient.from('tenants').update({ status: 'active' }).in('id', allTenantIds)
+      const { error: tenantUpdateErr } = await serviceClient
+        .from('tenants').update({ status: 'active' }).in('id', allTenantIds)
+      if (tenantUpdateErr) {
+        console.error('[tenant-sign] Tenant status update error:', tenantUpdateErr.message)
+      } else {
+        console.log('[tenant-sign] Tenant status updated to active for:', allTenantIds)
+      }
+    } else {
+      console.warn('[tenant-sign] No tenant IDs resolved — tenant status not updated')
     }
 
     // Generate final PDF with both signatures and send to all tenants

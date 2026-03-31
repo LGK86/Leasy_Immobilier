@@ -357,13 +357,19 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
   const handlePropertyChange = async (id: string | null) => {
     setPropertyId(id)
     if (!id) return
-    const { data } = await supabase.from('properties').select('monthly_rent, charges, deposit').eq('id', id).single()
+    const { data } = await supabase
+      .from('properties')
+      .select('monthly_rent, charges, deposit, surface, rooms_count')
+      .eq('id', id)
+      .single()
     if (data) {
       setForm(prev => ({
         ...prev,
         'Loyer mensuel (€)':     String(data.monthly_rent ?? ''),
         'Charges (€)':           String(data.charges ?? ''),
         'Depot de garantie (€)': String(data.deposit ?? ''),
+        ...(data.surface != null    ? { 'Surface habitable': String(data.surface) }    : {}),
+        ...(data.rooms_count != null ? { 'Nombre de pieces': String(data.rooms_count) } : {}),
       }))
       if (splitRent) updateRentSplit(tenantIds, data.monthly_rent)
     }

@@ -19,7 +19,7 @@ import { createDefaultInspectionContent, createDefaultInventoryContent } from '@
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Property { id: string; address: string; city: string }
-interface Tenant { id: string; first_name: string; last_name: string; property_id: string | null; email?: string | null }
+interface Tenant { id: string; first_name: string; last_name: string; property_id: string | null; email?: string | null; entry_date?: string | null }
 
 interface Props {
   type: 'entry_inspection' | 'exit_inspection' | 'inventory'
@@ -194,6 +194,18 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   const addTenant = (id: string) => {
     if (!id || tenantIds.includes(id)) return
     setTenantIds(prev => [...prev, id])
+    // For entry_inspection: pre-fill inspection date from tenant's entry_date
+    if (type === 'entry_inspection' && !(content as InspectionContent).inspection_date) {
+      const tenant = localTenants.find(t => t.id === id)
+      if (tenant?.entry_date) {
+        setField('inspection_date', tenant.entry_date)
+      } else {
+        // Fetch from DB if not in local state
+        supabase.from('tenants').select('entry_date').eq('id', id).single().then(({ data }) => {
+          if (data?.entry_date) setField('inspection_date', data.entry_date)
+        })
+      }
+    }
   }
   const removeTenant = (id: string) => setTenantIds(prev => prev.filter(t => t !== id))
 
@@ -837,26 +849,23 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
         </div>
 
         {isComparison ? (
-          <div className="w-full overflow-x-hidden">
-            {/* Header */}
-            <div className="grid items-center mb-2 gap-2" style={{ gridTemplateColumns: '1fr 1fr 2fr' }}>
-              <div className="text-sm font-semibold text-gray-600">Élément</div>
-              <div className="text-sm font-semibold text-center text-gray-500 bg-gray-100 rounded px-2 py-1">Entrée</div>
-              <div className="text-sm font-semibold text-center text-white rounded px-2 py-1" style={{ backgroundColor: '#063B26' }}>Sortie</div>
+          <div style={{ width: '100%', overflowX: 'hidden' }}>
+            {/* Comparison header */}
+            <div className="grid items-center mb-2 gap-2" style={{ gridTemplateColumns: '20% 15% 65%' }}>
+              <div className="text-sm font-semibold text-gray-600" style={{ overflow: 'hidden', minWidth: 0 }}>Élément</div>
+              <div className="text-sm font-semibold text-center text-gray-500 bg-gray-100 rounded px-2 py-1" style={{ overflow: 'hidden', minWidth: 0 }}>Entrée</div>
+              <div className="text-sm font-semibold text-center text-white rounded px-2 py-1" style={{ backgroundColor: '#063B26', overflow: 'hidden', minWidth: 0 }}>Sortie</div>
             </div>
             {room.elements.map((el: any, j: number) => {
               const entryEl = entryRoom?.elements?.find((e: any) => e.name === el.name) ?? entryRoom?.elements?.[j]
               return (
-                <div key={j} className="grid items-start gap-2 py-2 border-b border-gray-100" style={{ gridTemplateColumns: '1fr 1fr 2fr' }}>
-                  {/* Element name — fixed */}
-                  <div className="text-sm font-medium pt-2">{el.name || '—'}</div>
-                  {/* Entry — read-only */}
-                  <div className="flex flex-col gap-1 bg-gray-50 rounded p-2 text-sm text-gray-500">
+                <div key={j} className="grid items-start gap-2 py-2 border-b border-gray-100" style={{ gridTemplateColumns: '20% 15% 65%' }}>
+                  <div className="text-sm font-medium pt-2" style={{ overflow: 'hidden', minWidth: 0, textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{el.name || '—'}</div>
+                  <div className="flex flex-col gap-1 bg-gray-50 rounded p-2 text-sm text-gray-500" style={{ overflow: 'hidden', minWidth: 0 }}>
                     <span className="font-mono font-bold">{entryEl?.condition || '—'}</span>
-                    {entryEl?.description && <span className="text-xs">{entryEl.description}</span>}
+                    {entryEl?.description && <span className="text-xs truncate">{entryEl.description}</span>}
                   </div>
-                  {/* Exit — état + commentaire only */}
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2" style={{ overflow: 'hidden', minWidth: 0 }}>
                     <Select value={el.condition}
                       onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
                       <SelectTrigger className="w-full"><span className="text-sm">{el.condition}</span></SelectTrigger>
@@ -875,29 +884,37 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
             </Button>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div style={{ width: '100%', overflowX: 'hidden' }}>
             <div className="grid gap-2 text-xs font-medium text-slate-500 px-1" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5% auto' }}>
-              <span>Élément</span>
-              <span>État</span>
-              <span>Description</span>
-              <span>Commentaire</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Élément</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>État</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Description</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Commentaire</span>
               <span />
             </div>
             {room.elements.map((el: any, j: number) => (
-              <div key={j} className="grid gap-2 items-center" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5% auto' }}>
-                <Input className="text-xs" value={el.name}
-                  onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], name: e.target.value }; return { ...r, elements: els } })} />
-                <Select value={el.condition}
-                  onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
-                  <SelectTrigger className="w-full h-8"><span className="text-xs">{el.condition}</span></SelectTrigger>
-                  <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-                </Select>
-                <Input className="text-xs" placeholder="…"
-                  value={el.description}
-                  onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], description: e.target.value }; return { ...r, elements: els } })} />
-                <Input className="text-xs" placeholder="…"
-                  value={el.comment}
-                  onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], comment: e.target.value }; return { ...r, elements: els } })} />
+              <div key={j} className="grid gap-2 items-center mt-1" style={{ gridTemplateColumns: '15% 10% 37.5% 37.5% auto' }}>
+                <div style={{ overflow: 'hidden', minWidth: 0 }}>
+                  <Input className="text-xs w-full" value={el.name}
+                    onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], name: e.target.value }; return { ...r, elements: els } })} />
+                </div>
+                <div style={{ overflow: 'hidden', minWidth: 0 }}>
+                  <Select value={el.condition}
+                    onValueChange={(v: string | null) => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], condition: (v ?? 'A') as InspectionCondition }; return { ...r, elements: els } })}>
+                    <SelectTrigger className="w-full h-8"><span className="text-xs">{el.condition}</span></SelectTrigger>
+                    <SelectContent>{CONDITION_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div style={{ overflow: 'hidden', minWidth: 0 }}>
+                  <Input className="text-xs w-full" placeholder="…"
+                    value={el.description}
+                    onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], description: e.target.value }; return { ...r, elements: els } })} />
+                </div>
+                <div style={{ overflow: 'hidden', minWidth: 0 }}>
+                  <Input className="text-xs w-full" placeholder="…"
+                    value={el.comment}
+                    onChange={e => updateRoom(idx, r => { const els = [...r.elements]; els[j] = { ...els[j], comment: e.target.value }; return { ...r, elements: els } })} />
+                </div>
                 <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-400"
                   onClick={() => updateRoom(idx, r => ({ ...r, elements: r.elements.filter((_: any, k: number) => k !== j) }))}>
                   <Trash2 className="h-3 w-3" />
@@ -1180,7 +1197,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
 
       {/* Fixed footer: nav buttons */}
       <div className="flex-shrink-0 flex justify-center items-center gap-4 px-6 py-4 border-t bg-white">
-        <Button type="button" variant="outline" size="sm"
+        <Button type="button" variant="outline"
           onClick={() => {
             if (isSigSec && sigSubStep === 'send') {
               setSigSubStep('sign')
@@ -1189,20 +1206,20 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
             }
           }}
           disabled={sectionIndex === 0 && sigSubStep === 'sign'}>
-          <ChevronLeft className="h-4 w-4 mr-1" /> Précédent
+          Précédent
         </Button>
 
         {!isLastSec && (
-          <Button type="button" size="sm"
+          <Button type="button"
             onClick={() => setSectionIndex(i => Math.min(totalSec - 1, i + 1))}
             disabled={sectionIndex === 0 && !!dateWarning}
             className="text-[#063B26] font-semibold"
             style={{ backgroundColor: '#CFFF92' }}>
-            Suivant <ChevronRight className="h-4 w-4 ml-1" />
+            Suivant
           </Button>
         )}
 
-        <Button type="button" variant="ghost" size="sm"
+        <Button type="button" variant="ghost"
           onClick={handleSaveDraft} disabled={saving || generating}>
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
           Brouillon
