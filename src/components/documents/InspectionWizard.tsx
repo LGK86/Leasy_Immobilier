@@ -933,28 +933,28 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   // ─── Signatures section (last) — identical to bail flow ───────────────────
 
   const renderSignaturesSection = () => (
-    <div className="space-y-4 max-w-[500px] mx-auto">
-      {/* Mini step indicator */}
-      <div className="flex items-center gap-1 mb-2">
+    <div className="flex flex-col items-center w-full max-w-[500px] mx-auto px-4 space-y-4">
+      {/* Step indicator */}
+      <div className="flex justify-center items-center gap-4 mb-4 w-full">
         {(['sign', 'send'] as const).map((step, i) => {
           const labels = { sign: 'Signature', send: 'Envoi' }
           const done   = sigSubStep === 'send' && step === 'sign'
           const active = sigSubStep === step
           return (
-            <div key={step} className="flex items-center gap-1">
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                done   ? 'bg-emerald-100 text-emerald-700' :
-                active ? 'text-white' : 'bg-slate-100 text-slate-400'
-              }`} style={active ? { backgroundColor: '#063B26' } : {}}>
-                {done
-                  ? <CheckCircle2 className="h-3.5 w-3.5" />
-                  : <span className="h-4 w-4 flex items-center justify-center rounded-full border text-[10px] border-current">{i + 1}</span>
-                }
-                {labels[step]}
+            <div key={step} className="flex items-center gap-2">
+              <div className={`flex items-center gap-2 transition-colors ${
+                done   ? 'text-emerald-600' :
+                active ? 'font-bold text-[#063B26]' : 'text-slate-400'
+              }`}>
+                <span className={`w-7 h-7 rounded-full flex items-center justify-center border-2 text-xs font-medium ${
+                  done   ? 'border-emerald-500 bg-emerald-50 text-emerald-600' :
+                  active ? 'border-[#063B26] bg-[#063B26] text-white' : 'border-slate-300 text-slate-400'
+                }`}>
+                  {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
+                </span>
+                <span className="text-sm">{labels[step]}</span>
               </div>
-              {i === 0 && (
-                <div className={`h-px w-4 ${done ? 'bg-emerald-300' : 'bg-slate-200'}`} />
-              )}
+              {i === 0 && <div className={`w-8 h-px ${done ? 'bg-emerald-300' : 'bg-slate-200'}`} />}
             </div>
           )
         })}
@@ -988,7 +988,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
               </div>
             </>
           ) : (
-            <div className="max-w-[420px] mx-auto border border-slate-200 rounded-lg p-3">
+            <div className="mx-auto border border-slate-200 rounded-lg p-3" style={{ width: '420px' }}>
               <p className="text-xs text-slate-500 mb-2">Signez dans le cadre ci-dessous</p>
               <SignatureCanvas
                 onSave={(sig) => { setOwnerSig(sig); setSigSubStep('send') }}
@@ -1075,14 +1075,16 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-5 max-w-2xl mx-auto">
-      <ProgressBar current={sectionIndex} total={totalSec} label={sectionLabel} />
+    <div className="flex flex-col max-w-2xl mx-auto">
+      <div className="pb-3">
+        <ProgressBar current={sectionIndex} total={totalSec} label={sectionLabel} />
+      </div>
 
-      <div className="min-h-[300px]">
+      <div className="pb-4">
         {renderSection()}
       </div>
 
-      <div className="flex justify-center items-center gap-4 pt-4 border-t mt-6">
+      <div className="sticky bottom-0 bg-white border-t pt-4 pb-2 flex justify-center items-center gap-4">
         <Button type="button" variant="outline" size="sm"
           onClick={() => {
             if (isSigSec && sigSubStep === 'send') {

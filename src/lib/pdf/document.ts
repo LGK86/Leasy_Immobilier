@@ -494,8 +494,8 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
   const checkY = (needed: number) => { if (y < FOOTER_H + needed + 10) newPage() }
 
   const sectionTitle = (num: string, title: string) => {
-    checkY(30)
-    y -= 6
+    checkY(44)
+    y -= 24
     page.drawRectangle({ x: M - 4, y: y - 5, width: CW + 8, height: 21, color: COL_GREEN })
     const label = num ? `${num}. ${sa(title)}` : sa(title)
     page.drawText(label, { x: M + 2, y: y + 2, size: 9, font: HLVB, color: COL_WHITE })
@@ -503,10 +503,10 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
   }
 
   const field = (label: string, value: string) => {
-    checkY(16)
+    checkY(18)
     page.drawText(`${sa(label)} :`, { x: M, y, size: 9, font: HLVB, color: COL_MID })
     page.drawText(sa(value) || '—', { x: M + 145, y, size: 9, font: HLV, color: COL_DARK })
-    y -= 14
+    y -= 16
   }
 
   const drawTable = (headers: string[], rows: string[][], colRatios: number[]) => {
@@ -580,7 +580,7 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
   field('Adresse', data.ownerAddress)
   if (data.ownerEmail) field('Email', data.ownerEmail)
   if (data.ownerPhone) field('Telephone', data.ownerPhone)
-  y -= 6
+  y -= 8
 
   // ── 2. LOCATAIRES ──────────────────────────────────────────────
   sectionTitle('2', data.tenants.length > 1 ? 'LOCATAIRES' : 'LOCATAIRE')
@@ -593,7 +593,7 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
       if (t.phone) field('Telephone', t.phone)
     }
   }
-  y -= 6
+  y -= 8
 
   // ── 3. LOCAUX ──────────────────────────────────────────────────
   sectionTitle('3', 'LOCAUX')
@@ -608,7 +608,7 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
       checkY(12); page.drawText(line, { x: M + 10, y, size: 8.5, font: HLV, color: COL_DARK }); y -= 13
     }
   }
-  y -= 6
+  y -= 8
 
   // ── 4. MOYENS D'ACCES ─────────────────────────────────────────
   sectionTitle('4', "MOYENS D ACCES")
@@ -648,7 +648,7 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
     field('Nombre de radiateurs', String(h.radiator_count))
     field('Etat des radiateurs', sa(h.radiator_condition ?? ''))
   }
-  y -= 6
+  y -= 8
 
   // ── 7. RELEVE DES COMPTEURS ───────────────────────────────────
   sectionTitle('7', 'RELEVE DES COMPTEURS')
@@ -670,6 +670,10 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
   // ── 8+. PIECES ────────────────────────────────────────────────
   const rooms = Array.isArray(c.rooms) ? c.rooms : []
   rooms.forEach((room: any, ri: number) => {
+    const elemCount = Array.isArray(room.elements) ? room.elements.length : 0
+    // Pre-check: ensure title + table header + at least 3 rows fit on same page
+    const minRoomSpace = 50 + ROW_H + Math.min(elemCount, 3) * ROW_H
+    if (y - FOOTER_H < minRoomSpace) newPage()
     sectionTitle(String(8 + ri), sa(room.name ?? `Piece ${ri + 1}`).toUpperCase())
     const elements = Array.isArray(room.elements) ? room.elements : []
     if (elements.length > 0) {
@@ -692,6 +696,8 @@ export async function generateInspectionPDF(data: DocumentData): Promise<Uint8Ar
   })
 
   // ── OBSERVATIONS ET SIGNATURES ────────────────────────────────
+  // Ensure enough space for section title + legal text + at least one sig row
+  if (y - FOOTER_H < 160) newPage()
   sectionTitle('', 'OBSERVATIONS ET SIGNATURES')
 
   if (c.general_observations && sa(c.general_observations).trim()) {
