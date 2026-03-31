@@ -101,38 +101,67 @@ export async function POST(request: NextRequest) {
 
   await supabase.from('documents').update(updates).eq('id', documentId)
 
-  // Auto-close when an exit inspection is finalized
+  // Sync property surface/rooms_count from lease content
+  if (doc.type === 'lease' && doc.property_id) {
+    const surface = parseFloat(doc.content?.['Surface habitable'] || doc.content?.['Surface'] || '')
+    const roomsCount = parseInt(doc.content?.['Nombre de pieces'] || '')
+    const propUpdates: Record<string, unknown> = {}
+    if (!isNaN(surface) && surface > 0) propUpdates.surface = surface
+    if (!isNaN(roomsCount) && roomsCount > 0) propUpdates.rooms_count = roomsCount
+    if (Object.keys(propUpdates).length > 0) {
+      await supabase.from('properties').update(propUpdates).eq('id', doc.property_id)
+    }
+  }
+
+  // Auto-close when an exit inspection is generated
   if (doc.type === 'exit_inspection' && doc.content?.linked_inspection_id) {
     const linkedId = doc.content.linked_inspection_id as string
     const closedAt = new Date().toISOString()
+    console.log('[generate] Auto-close: linked entry inspection:', linkedId)
+    console.log('[generate] Auto-close: property_id:', doc.property_id)
 
-    // Fetch entry inspection to preserve its content
-    const { data: entryDoc } = await supabase
-      .from('documents').select('content').eq('id', linkedId).single()
+    // Fetch & close the entry inspection
+    const { data: entryDoc, error: entryErr } = await supabase
+      .from('documents').select('id, content').eq('id', linkedId).eq('owner_id', user.id).single()
+    if (entryErr) console.error('[generate] Entry doc fetch error:', entryErr.message)
     if (entryDoc) {
-      await supabase.from('documents')
+      const { error: closeErr } = await supabase.from('documents')
         .update({ status: 'finalized', content: { ...entryDoc.content, closed_at: closedAt }, updated_at: closedAt })
-        .eq('id', linkedId)
+        .eq('id', linkedId).eq('owner_id', user.id)
+      if (closeErr) console.error('[generate] Entry close error:', closeErr.message)
+      else console.log('[generate] Entry inspection closed:', linkedId)
     }
 
     // Close active lease for the property
     if (doc.property_id) {
-      const { data: leaseDoc } = await supabase
+      const { data: leaseDoc, error: leaseErr } = await supabase
         .from('documents').select('id, content')
-        .eq('property_id', doc.property_id).eq('type', 'lease').eq('status', 'signed')
+        .eq('property_id', doc.property_id).eq('type', 'lease').eq('owner_id', user.id)
+        .in('status', ['signed', 'pending_tenant_signature', 'finalized'])
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle()
+      if (leaseErr) console.error('[generate] Lease fetch error:', leaseErr.message)
       if (leaseDoc) {
-        await supabase.from('documents')
+        const { error: leaseCloseErr } = await supabase.from('documents')
           .update({ status: 'finalized', content: { ...leaseDoc.content, closed_at: closedAt }, updated_at: closedAt })
-          .eq('id', leaseDoc.id)
+          .eq('id', leaseDoc.id).eq('owner_id', user.id)
+        if (leaseCloseErr) console.error('[generate] Lease close error:', leaseCloseErr.message)
+        else console.log('[generate] Lease closed:', leaseDoc.id)
       }
 
-      await supabase.from('properties').update({ status: 'vacant', updated_at: closedAt }).eq('id', doc.property_id)
+      const { error: propErr } = await supabase.from('properties')
+        .update({ status: 'vacant', updated_at: closedAt }).eq('id', doc.property_id).eq('owner_id', user.id)
+      if (propErr) console.error('[generate] Property vacant error:', propErr.message)
+      else console.log('[generate] Property set to vacant:', doc.property_id)
     }
 
     // Set tenants inactive
     if (tenantIds.length > 0) {
-      await supabase.from('tenants').update({ status: 'inactive', updated_at: closedAt }).in('id', tenantIds)
+      const { error: tenantErr } = await supabase.from('tenants')
+        .update({ status: 'inactive', updated_at: closedAt }).in('id', tenantIds).eq('owner_id', user.id)
+      if (tenantErr) console.error('[generate] Tenant inactive error:', tenantErr.message)
+      else console.log('[generate] Tenants set to inactive:', tenantIds)
     }
   }
 

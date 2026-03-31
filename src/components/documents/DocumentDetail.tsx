@@ -151,8 +151,10 @@ export default function DocumentDetail({ document: doc, onSigned, properties, te
 
       if (tenantIds.length > 0) {
         const docStatus = docState.tenant_signature ? 'finalized' : 'signed'
-        const tenantStatus = docStatus === 'finalized' ? 'lease_signed' : 'pending_signature'
-        await supabase.from('tenants').update({ status: tenantStatus }).in('id', tenantIds)
+        // Only update to 'active' when document is fully finalized (both parties signed)
+        if (docStatus === 'finalized') {
+          await supabase.from('tenants').update({ status: 'active' }).in('id', tenantIds)
+        }
       }
 
       // Mettre à jour le statut du bien si c'est un bail

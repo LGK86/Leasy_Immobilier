@@ -160,9 +160,18 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
     if (d.type !== 'entry_inspection') return false
     if (d.property_id !== propertyId) return false
     if (d.status !== 'finalized') return false
+    if (d.content?.closed_at) return false
     if (!exitDate) return true
     return new Date(d.content?.inspection_date) < new Date(exitDate)
   })
+  // The single active entry EDL for this property (auto-linked)
+  const singleEntryEDL = availableEntryInspections[0] ?? null
+
+  // Date validation: exit date must be after entry date
+  const dateWarning = type === 'exit_inspection' && linkedEntryInspection &&
+    (content as InspectionContent).inspection_date &&
+    linkedEntryInspection.content?.inspection_date &&
+    new Date((content as InspectionContent).inspection_date) <= new Date(linkedEntryInspection.content.inspection_date)
 
   // ── Property selection with auto-fill ────────────────────────
   const handlePropertySelect = async (pid: string) => {
@@ -386,12 +395,35 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
                 type="checkbox"
                 id="link_entry_inspection"
                 checked={linkEntryInspection}
+                disabled={!propertyId || singleEntryEDL === null}
                 onChange={e => {
-                  setLinkEntryInspection(e.target.checked)
-                  if (!e.target.checked) {
+                  const checked = e.target.checked
+                  setLinkEntryInspection(checked)
+                  if (!checked) {
                     setLinkedEntryId('')
                     setLinkedEntryInspection(null)
                     setField('linked_inspection_id', null)
+                  } else if (singleEntryEDL) {
+                    // Auto-select the unique available entry EDL
+                    const entryDoc = singleEntryEDL
+                    setLinkedEntryId(entryDoc.id)
+                    setLinkedEntryInspection(entryDoc)
+                    setField('linked_inspection_id', entryDoc.id)
+                    if (entryDoc.content) {
+                      const ec = entryDoc.content as InspectionContent
+                      setContent(prev => ({
+                        ...prev,
+                        rooms:       JSON.parse(JSON.stringify(ec.rooms       ?? [])),
+                        accessories: JSON.parse(JSON.stringify(ec.accessories ?? [])),
+                        heating:     { ...ec.heating },
+                        meters:      JSON.parse(JSON.stringify(ec.meters      ?? [])),
+                        access_keys: JSON.parse(JSON.stringify(ec.access_keys ?? [])),
+                      } as InspectionContent))
+                      if (Array.isArray(ec.tenant_ids) && ec.tenant_ids.length > 0) setTenantIds(ec.tenant_ids)
+                      if (ec.description) setField('description', ec.description)
+                      if (ec.surface != null) setSurface(String(ec.surface))
+                      if (ec.rooms_count != null) setRoomsCount(String(ec.rooms_count))
+                    }
                   }
                 }}
                 className="h-4 w-4 accent-[#063B26]"
@@ -400,53 +432,17 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
                 Clôturer un état des lieux d&apos;entrée existant ?
               </label>
             </div>
-            {linkEntryInspection && (
-              <LF label="Sélectionner l'état des lieux d'entrée">
-                <Select
-                  value={linkedEntryId || undefined}
-                  onValueChange={(v: string | null) => {
-                    const id = v ?? ''
-                    setLinkedEntryId(id)
-                    setField('linked_inspection_id', id || null)
-                    if (id) {
-                      const entryDoc = allDocuments.find(d => d.id === id)
-                      setLinkedEntryInspection(entryDoc ?? null)
-                      if (entryDoc?.content) {
-                        const ec = entryDoc.content as InspectionContent
-                        setContent(prev => ({
-                          ...prev,
-                          rooms:       JSON.parse(JSON.stringify(ec.rooms       ?? [])),
-                          accessories: JSON.parse(JSON.stringify(ec.accessories ?? [])),
-                          heating:     { ...ec.heating },
-                          meters:      JSON.parse(JSON.stringify(ec.meters      ?? [])),
-                          access_keys: JSON.parse(JSON.stringify(ec.access_keys ?? [])),
-                        } as InspectionContent))
-                        if (Array.isArray(ec.tenant_ids) && ec.tenant_ids.length > 0) {
-                          setTenantIds(ec.tenant_ids)
-                        }
-                        if (ec.description) setField('description', ec.description)
-                        if (ec.surface != null) setSurface(String(ec.surface))
-                        if (ec.rooms_count != null) setRoomsCount(String(ec.rooms_count))
-                      }
-                    } else {
-                      setLinkedEntryInspection(null)
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <span className="flex-1 text-left truncate text-sm">
-                      {linkedEntryId
-                        ? availableEntryInspections.find(d => d.id === linkedEntryId)?.title ?? 'Sélectionné'
-                        : <span className="text-muted-foreground">Choisir un état des lieux d&apos;entrée</span>}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableEntryInspections.length === 0
-                      ? <SelectItem value="_none" disabled>Aucun état des lieux finalisé pour ce bien</SelectItem>
-                      : availableEntryInspections.map(d => <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </LF>
+            {propertyId && singleEntryEDL === null && (
+              <p className="text-xs text-slate-400 italic">Aucun état des lieux d&apos;entrée finalisé trouvé pour ce bien</p>
+            )}
+            {linkEntryInspection && singleEntryEDL && (
+              <div className="bg-white border border-emerald-200 rounded px-3 py-2 text-sm text-slate-700">
+                <span className="text-xs text-slate-400 block mb-0.5">EDL d&apos;entrée lié</span>
+                {singleEntryEDL.title}
+                {singleEntryEDL.content?.inspection_date && (
+                  <span className="text-slate-400 ml-2 text-xs">— {new Date(singleEntryEDL.content.inspection_date).toLocaleDateString('fr-FR')}</span>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -538,6 +534,13 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
             onChange={e => setField(isInventory ? 'inventory_date' : 'inspection_date', e.target.value)}
             className="text-sm"
           />
+          {type === 'exit_inspection' && linkedEntryInspection && ic.inspection_date &&
+            linkedEntryInspection.content?.inspection_date &&
+            new Date(ic.inspection_date) <= new Date(linkedEntryInspection.content.inspection_date) && (
+            <p className="text-red-500 text-xs mt-1">
+              ⚠️ La date de sortie doit être postérieure à la date d&apos;entrée ({new Date(linkedEntryInspection.content.inspection_date).toLocaleDateString('fr-FR')})
+            </p>
+          )}
         </LF>
 
         {!isInventory && (
@@ -648,7 +651,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
         <div className="space-y-3">
           <p className="text-sm font-medium text-slate-700">Accessoires et équipements</p>
           <div className="overflow-x-hidden">
-            <div className="grid items-center mb-2 gap-2" style={{ gridTemplateColumns: '40% 20% 40%' }}>
+            <div className="grid items-center mb-2 gap-2" style={{ gridTemplateColumns: '2fr 1fr 2fr' }}>
               <div className="text-xs font-medium text-slate-500">Accessoire</div>
               <div className="text-xs font-medium text-slate-600 bg-slate-100 rounded px-1 py-0.5 text-center">Entrée</div>
               <div className="text-xs font-medium text-white rounded px-1 py-0.5 text-center" style={{ backgroundColor: '#063B26' }}>Sortie</div>
@@ -656,7 +659,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
             {ic.accessories.map((acc, i) => {
               const entryAcc = entryAccessories.find((a: any) => a.name === acc.name) ?? entryAccessories[i]
               return (
-                <div key={i} className="grid items-center gap-2 py-1.5 border-b border-slate-100" style={{ gridTemplateColumns: '40% 20% 40%' }}>
+                <div key={i} className="grid items-center gap-2 py-1.5 border-b border-slate-100" style={{ gridTemplateColumns: '2fr 1fr 2fr' }}>
                   <div className="text-sm text-slate-700">{acc.name || '—'}</div>
                   <div className="bg-slate-50 border border-slate-100 rounded p-1.5 text-center">
                     <span className="text-xs font-mono font-bold text-slate-600">{entryAcc?.condition ?? '—'}</span>
@@ -834,9 +837,9 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
         </div>
 
         {isComparison ? (
-          <div className="overflow-x-hidden">
+          <div className="w-full overflow-x-hidden">
             {/* Header */}
-            <div className="grid items-center mb-2 gap-2" style={{ gridTemplateColumns: '20% 15% 65%' }}>
+            <div className="grid items-center mb-2 gap-2" style={{ gridTemplateColumns: '1fr 1fr 2fr' }}>
               <div className="text-sm font-semibold text-gray-600">Élément</div>
               <div className="text-sm font-semibold text-center text-gray-500 bg-gray-100 rounded px-2 py-1">Entrée</div>
               <div className="text-sm font-semibold text-center text-white rounded px-2 py-1" style={{ backgroundColor: '#063B26' }}>Sortie</div>
@@ -844,7 +847,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
             {room.elements.map((el: any, j: number) => {
               const entryEl = entryRoom?.elements?.find((e: any) => e.name === el.name) ?? entryRoom?.elements?.[j]
               return (
-                <div key={j} className="grid items-start gap-2 py-2 border-b border-gray-100" style={{ gridTemplateColumns: '20% 15% 65%' }}>
+                <div key={j} className="grid items-start gap-2 py-2 border-b border-gray-100" style={{ gridTemplateColumns: '1fr 1fr 2fr' }}>
                   {/* Element name — fixed */}
                   <div className="text-sm font-medium pt-2">{el.name || '—'}</div>
                   {/* Entry — read-only */}
@@ -1171,7 +1174,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-4">
         {renderSection()}
       </div>
 
@@ -1192,6 +1195,7 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
         {!isLastSec && (
           <Button type="button" size="sm"
             onClick={() => setSectionIndex(i => Math.min(totalSec - 1, i + 1))}
+            disabled={sectionIndex === 0 && !!dateWarning}
             className="text-[#063B26] font-semibold"
             style={{ backgroundColor: '#CFFF92' }}>
             Suivant <ChevronRight className="h-4 w-4 ml-1" />
