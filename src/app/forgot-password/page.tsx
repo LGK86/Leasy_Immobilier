@@ -27,8 +27,8 @@ export default function ForgotPasswordPage() {
     })
 
     if (error) {
-      console.error('Reset password error:', error)
-      setError(error.message)
+      console.error('Supabase reset error:', JSON.stringify(error))
+      setError(`Erreur: ${error.message} (status: ${error.status})`)
     } else {
       setSent(true)
     }
