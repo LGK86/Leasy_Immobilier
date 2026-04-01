@@ -243,3 +243,15 @@ Deux fonctions de génération :
   - 🐛 Corrections de bugs
   - ✨ Améliorations UX/UI
 - Claude crée un brouillon Gmail à amor.faycal1@gmail.com
+
+---
+
+## Domaines
+
+- Prod : app.leasy-immo.fr → Vercel projet leasy-immobilier → Supabase ekuhrnysmmswxelfwvnj
+- Staging : demo.leasy-immo.fr → Vercel projet leasy-immobilier-staging → Supabase bpgqhifwvidleiqvrfsl
+
+Note : le domaine est leasy-immo.fr (PAS leasy-immobilier.fr)
+
+Supabase prod Site URL : https://app.leasy-immo.fr
+Supabase staging Site URL : https://demo.leasy-immo.fr

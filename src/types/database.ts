@@ -21,7 +21,7 @@ export type Property = {
   monthly_rent: number
   charges: number
   deposit: number
-  status: 'rented' | 'vacant'
+  status: 'rented' | 'vacant' | 'upcoming'
   description: string | null
   surface: number | null
   rooms_count: number | null
