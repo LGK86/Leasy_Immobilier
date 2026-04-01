@@ -8,8 +8,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Separator } from '@/components/ui/separator'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Loader2, User, MapPin, Phone, Lock } from 'lucide-react'
+import { Loader2, User, MapPin, Lock } from 'lucide-react'
 import type { Profile } from '@/types/database'
+
+function getPasswordStrength(password: string) {
+  if (password.length < 8) return { label: 'Faible', color: 'red' as const }
+  if (!/[A-Z]/.test(password) || !/[0-9]/.test(password)) return { label: 'Moyen', color: 'orange' as const }
+  return { label: 'Fort', color: 'green' as const }
+}
+
+const strengthStyles = {
+  red: { bar: 'bg-red-500', text: 'text-red-600', width: 'w-1/3' },
+  orange: { bar: 'bg-orange-500', text: 'text-orange-600', width: 'w-2/3' },
+  green: { bar: 'bg-emerald-500', text: 'text-emerald-600', width: 'w-full' },
+}
 
 interface Props {
   profile: Profile | null
@@ -29,7 +41,9 @@ export default function SettingsForm({ profile, userId }: Props) {
     city: profile?.city ?? '',
     postal_code: profile?.postal_code ?? '',
   })
-  const [newPassword, setNewPassword] = useState('')
+  const [pwForm, setPwForm] = useState({ current: '', new: '', confirm: '' })
+  const [pwErrors, setPwErrors] = useState<{ current?: string; new?: string; confirm?: string }>({})
+  const strength = pwForm.new ? getPasswordStrength(pwForm.new) : null
 
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [key]: e.target.value }))
@@ -49,11 +63,34 @@ export default function SettingsForm({ profile, userId }: Props) {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (newPassword.length < 6) { toast.error('Le mot de passe doit contenir au moins 6 caractères'); return }
+    const errs: typeof pwErrors = {}
+
+    if (!pwForm.current) errs.current = 'Champ requis'
+    if (pwForm.new.length < 8) errs.new = 'Le mot de passe doit contenir au moins 8 caractères'
+    if (pwForm.new !== pwForm.confirm) errs.confirm = 'Les mots de passe ne correspondent pas'
+
+    if (Object.keys(errs).length > 0) { setPwErrors(errs); return }
+    setPwErrors({})
     setPwLoading(true)
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) toast.error('Erreur : ' + error.message)
-    else { toast.success('Mot de passe mis à jour'); setNewPassword('') }
+
+    // Vérifier le mot de passe actuel
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: form.email,
+      password: pwForm.current,
+    })
+    if (signInError) {
+      setPwErrors({ current: 'Mot de passe actuel incorrect' })
+      setPwLoading(false)
+      return
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: pwForm.new })
+    if (error) {
+      toast.error('Erreur : ' + error.message)
+    } else {
+      toast.success('Mot de passe mis à jour')
+      setPwForm({ current: '', new: '', confirm: '' })
+    }
     setPwLoading(false)
   }
 
@@ -120,26 +157,62 @@ export default function SettingsForm({ profile, userId }: Props) {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Lock className="h-5 w-5 text-blue-600" />
-            <CardTitle className="text-base">Sécurité</CardTitle>
+            <CardTitle className="text-base">Modifier le mot de passe</CardTitle>
           </div>
-          <CardDescription>Modifiez votre mot de passe</CardDescription>
+          <CardDescription>
+            Choisissez un mot de passe sécurisé d&apos;au moins 8 caractères.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handlePasswordChange} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Mot de passe actuel</Label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={pwForm.current}
+                onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))}
+              />
+              {pwErrors.current && <p className="text-xs text-red-600">{pwErrors.current}</p>}
+            </div>
+
             <div className="space-y-2">
               <Label>Nouveau mot de passe</Label>
               <Input
                 type="password"
                 placeholder="••••••••"
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                minLength={6}
-                required
+                value={pwForm.new}
+                onChange={e => setPwForm(f => ({ ...f, new: e.target.value }))}
               />
+              {pwForm.new && strength && (
+                <div className="space-y-1 pt-1">
+                  <div className="h-1.5 w-full rounded-full bg-slate-200">
+                    <div
+                      className={`h-1.5 rounded-full transition-all duration-300 ${strengthStyles[strength.color].bar} ${strengthStyles[strength.color].width}`}
+                    />
+                  </div>
+                  <p className={`text-xs font-medium ${strengthStyles[strength.color].text}`}>
+                    Force : {strength.label}
+                  </p>
+                </div>
+              )}
+              {pwErrors.new && <p className="text-xs text-red-600">{pwErrors.new}</p>}
             </div>
-            <Button type="submit" disabled={pwLoading} variant="outline">
+
+            <div className="space-y-2">
+              <Label>Confirmer le nouveau mot de passe</Label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={pwForm.confirm}
+                onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+              />
+              {pwErrors.confirm && <p className="text-xs text-red-600">{pwErrors.confirm}</p>}
+            </div>
+
+            <Button type="submit" disabled={pwLoading}>
               {pwLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Changer le mot de passe
+              Mettre à jour le mot de passe
             </Button>
           </form>
         </CardContent>
