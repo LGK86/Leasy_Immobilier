@@ -237,6 +237,40 @@ export default function InspectionWizard({ type, properties, tenants, userId, al
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantIds, propertyId])
 
+  // Pre-fill inventory_date from active lease start date (inventory only, when date is empty)
+  useEffect(() => {
+    if (type !== 'inventory') return
+    if (!propertyId) return
+
+    const fetchLeaseStartDate = async () => {
+      const { data: lease } = await supabase
+        .from('documents')
+        .select('content')
+        .eq('property_id', propertyId)
+        .eq('type', 'lease')
+        .in('status', ['signed', 'finalized', 'pending_tenant_signature'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const startDate: string | undefined =
+        lease?.content?.["Date d'entree"] ||
+        lease?.content?.["Date d'entrée"] ||
+        lease?.content?.start_date
+
+      if (startDate) {
+        setContent(prev => {
+          const vc = prev as InventoryContent
+          if (vc.inventory_date) return prev
+          return { ...prev, inventory_date: startDate } as InventoryContent
+        })
+      }
+    }
+
+    fetchLeaseStartDate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propertyId])
+
   // ── Generic content updater ───────────────────────────────────
   const setField = (key: string, value: unknown) => {
     setContent(prev => ({ ...prev, [key]: value }) as InspectionContent | InventoryContent)
