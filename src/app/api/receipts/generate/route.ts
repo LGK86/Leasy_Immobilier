@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { paymentId, sendEmail = false, propertyId, tenantId, periodMonth, periodYear } = body
 
-    console.log('[receipt/generate] START | user:', user.id, '| property:', propertyId, '| tenant:', tenantId, '| period:', periodMonth, '/', periodYear)
+    const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
+    console.log('[receipt/generate] START | user:', user.id, '| ip:', ip, '| property:', propertyId, '| tenant:', tenantId, '| period:', periodMonth, '/', periodYear)
 
     // Get profile
     const { data: profile, error: profileError } = await supabase

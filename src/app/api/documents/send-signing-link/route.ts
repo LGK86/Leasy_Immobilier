@@ -13,6 +13,9 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const ip = (req as import('next/server').NextRequest).headers.get('x-forwarded-for') ?? 'unknown'
+  console.log('[documents/send-signing-link] user:', user.id, '| ip:', ip)
+
   const { documentId } = await req.json()
   if (!documentId) return NextResponse.json({ error: 'Missing documentId' }, { status: 400 })
 

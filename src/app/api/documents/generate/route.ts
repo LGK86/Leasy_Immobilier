@@ -13,6 +13,9 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
+  console.log('[documents/generate] user:', user.id, '| ip:', ip)
+
   const body = await request.json()
   const { documentId, sendEmail = false } = body
 
