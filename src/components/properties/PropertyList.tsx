@@ -53,6 +53,8 @@ export default function PropertyList({ properties, userId }: { properties: Prope
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [showRented, setShowRented] = useState(true)
   const [showUpcoming, setShowUpcoming] = useState(true)
+  const [showPendingLease, setShowPendingLease] = useState(true)
+  const [showDraft, setShowDraft] = useState(true)
   const [showVacant, setShowVacant] = useState(true)
   const router = useRouter()
   const supabase = createClient()
@@ -60,6 +62,22 @@ export default function PropertyList({ properties, userId }: { properties: Prope
   const rented = properties.filter(p => p.status === 'rented')
   const upcoming = properties.filter(p => p.status === 'upcoming')
   const vacant = properties.filter(p => p.status === 'vacant')
+  const pendingLease = properties.filter(p => {
+    const leases = (p.documents ?? []).filter(d => d.type === 'lease')
+    const activeLease = [...leases].reverse().find(d =>
+      ['signed', 'pending_tenant_signature', 'finalized'].includes(d.status) &&
+      !d.content?.closed_at
+    )
+    return activeLease?.status === 'pending_tenant_signature'
+  })
+  const draft = properties.filter(p => {
+    const leases = (p.documents ?? []).filter(d => d.type === 'lease')
+    const hasActiveLease = leases.some(d =>
+      ['signed', 'pending_tenant_signature', 'finalized'].includes(d.status) &&
+      !d.content?.closed_at
+    )
+    return !hasActiveLease && p.status === 'vacant'
+  })
 
   const PropertyCard = ({ property }: { property: PropertyWithDocs }) => (
     <Card key={property.id} className="hover:shadow-md transition-shadow">
@@ -136,7 +154,7 @@ export default function PropertyList({ properties, userId }: { properties: Prope
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Mes biens</h1>
           <p className="text-slate-500 mt-1">
-            {properties.length} bien(s) — {rented.length} loué(s) · {upcoming.length} à venir · {vacant.length} vacant(s)
+            {properties.length} bien(s) — {rented.length} loué(s) · {upcoming.length} à venir · {pendingLease.length} bail en attente · {draft.length} brouillon(s) · {vacant.length} vacant(s)
           </p>
         </div>
         <Button onClick={() => { setEditProperty(null); setOpen(true) }}>
@@ -194,6 +212,46 @@ export default function PropertyList({ properties, userId }: { properties: Prope
               {showUpcoming && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {upcoming.map(p => <PropertyCard key={p.id} property={p} />)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {pendingLease.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-4 cursor-pointer group select-none" onClick={() => setShowPendingLease(!showPendingLease)}>
+                <h2 className="text-lg font-semibold text-slate-700">Bail en attente</h2>
+                <span className="bg-orange-100 text-orange-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                  {pendingLease.length}
+                </span>
+                <div className="ml-auto flex items-center gap-1.5 text-xs text-slate-400 group-hover:text-slate-600 transition-colors">
+                  <span>{showPendingLease ? 'Masquer' : 'Afficher'}</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showPendingLease ? '' : '-rotate-90'}`} />
+                </div>
+              </div>
+              {showPendingLease && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pendingLease.map(p => <PropertyCard key={p.id} property={p} />)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {draft.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-4 cursor-pointer group select-none" onClick={() => setShowDraft(!showDraft)}>
+                <h2 className="text-lg font-semibold text-slate-700">Brouillon</h2>
+                <span className="bg-slate-100 text-slate-600 text-xs font-medium px-2 py-0.5 rounded-full">
+                  {draft.length}
+                </span>
+                <div className="ml-auto flex items-center gap-1.5 text-xs text-slate-400 group-hover:text-slate-600 transition-colors">
+                  <span>{showDraft ? 'Masquer' : 'Afficher'}</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showDraft ? '' : '-rotate-90'}`} />
+                </div>
+              </div>
+              {showDraft && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {draft.map(p => <PropertyCard key={p.id} property={p} />)}
                 </div>
               )}
             </div>
