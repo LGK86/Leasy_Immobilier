@@ -6,6 +6,7 @@ import { Building2, Users, CreditCard, TrendingUp, AlertCircle, CheckCircle2 } f
 import Link from 'next/link'
 import Sidebar from '@/components/dashboard/Sidebar'
 import Header from '@/components/dashboard/Header'
+import OnboardingContainer from '@/components/dashboard/OnboardingContainer'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -18,12 +19,14 @@ export default async function DashboardPage() {
   const [
     { data: profile },
     { data: properties },
+    { data: onboardingProperties },
     { data: tenants },
     { data: payments },
     { data: currentMonthPayments },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('properties').select('*').eq('owner_id', user.id),
+    supabase.from('properties').select('id, address, city').eq('owner_id', user.id),
     supabase.from('tenants').select('*').eq('owner_id', user.id),
     supabase.from('rent_payments').select('*, tenant:tenants(first_name, last_name), property:properties(address)').eq('owner_id', user.id).order('created_at', { ascending: false }).limit(5),
     supabase.from('rent_payments').select('*').eq('owner_id', user.id).eq('period_month', currentMonth).eq('period_year', currentYear),
@@ -83,6 +86,11 @@ export default async function DashboardPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header profile={profile} />
         <main className="flex-1 overflow-y-auto p-6">
+          <OnboardingContainer
+            initialStep={profile?.onboarding_step ?? 0}
+            userId={user.id}
+            initialProperties={onboardingProperties ?? []}
+          />
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-slate-800">
               Bonjour {profile?.first_name ?? ''} 👋

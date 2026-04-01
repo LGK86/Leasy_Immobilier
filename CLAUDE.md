@@ -222,3 +222,24 @@ Deux fonctions de génération :
 - Hébergé sur **Vercel**.
 - Le build local (`npm run build`) doit passer sans erreurs avant de push.
 - Erreur courante Vercel : `Failed to collect page data for /api/...` → ajouter `export const dynamic = 'force-dynamic'` en tête de route.
+
+---
+
+## Gestion des branches
+
+- **Petits fixes** → directement sur `dev`
+- **Grosses features** → créer une branche `feature/nom-feature` depuis `dev`
+  - Push sur la branche feature
+  - Merge dans `dev` quand la feature est validée sur staging
+  - Merge `dev` → `main` pour passer en prod
+
+---
+
+## Récap de session
+
+- En fin de session, demander à Claude de générer un récap par catégorie :
+  - 🆕 Nouvelles features
+  - 🔄 Updates features existantes
+  - 🐛 Corrections de bugs
+  - ✨ Améliorations UX/UI
+- Claude crée un brouillon Gmail à amor.faycal1@gmail.com
