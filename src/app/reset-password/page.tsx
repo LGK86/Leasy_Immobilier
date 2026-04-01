@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -27,11 +27,22 @@ export default function ResetPasswordPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false)
   const [errors, setErrors] = useState<{ new?: string; confirm?: string }>({})
   const router = useRouter()
   const supabase = createClient()
 
   const strength = newPassword ? getPasswordStrength(newPassword) : null
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        setSessionReady(true)
+      }
+    })
+    return () => { authListener.subscription.unsubscribe() }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,11 +59,35 @@ export default function ResetPasswordPage() {
 
     if (error) {
       toast.error('Erreur : ' + error.message)
-    } else {
-      toast.success('Mot de passe mis à jour avec succès')
-      router.push('/login')
+      setLoading(false)
+      return
     }
-    setLoading(false)
+
+    toast.success('Mot de passe mis à jour avec succès')
+    router.push('/login')
+  }
+
+  if (!sessionReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+        <div className="w-full max-w-md">
+          <div className="flex justify-center mb-8">
+            <div className="flex items-center gap-2">
+              <div className="bg-blue-600 p-2 rounded-lg">
+                <Building2 className="h-6 w-6 text-white" />
+              </div>
+              <span className="text-2xl font-bold text-slate-800">Leasy Immobilier</span>
+            </div>
+          </div>
+          <Card>
+            <CardContent className="py-10 text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-3 text-slate-400" />
+              <p className="text-sm text-slate-500">Vérification du lien en cours...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
   }
 
   return (
