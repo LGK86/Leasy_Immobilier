@@ -161,12 +161,15 @@ export default function PropertyList({ properties, userId }: { properties: Prope
         <div>
           {rented.length > 0 && (
             <div className="mb-8">
-              <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={() => setShowRented(!showRented)}>
+              <div className="flex items-center gap-2 mb-4 cursor-pointer group select-none" onClick={() => setShowRented(!showRented)}>
                 <h2 className="text-lg font-semibold text-slate-700">Loué</h2>
                 <span className="bg-emerald-100 text-emerald-700 text-xs font-medium px-2 py-0.5 rounded-full">
                   {rented.length}
                 </span>
-                <ChevronDown className={`h-4 w-4 text-slate-400 ml-auto transition-transform ${showRented ? '' : '-rotate-90'}`} />
+                <div className="ml-auto flex items-center gap-1.5 text-xs text-slate-400 group-hover:text-slate-600 transition-colors">
+                  <span>{showRented ? 'Masquer' : 'Afficher'}</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showRented ? '' : '-rotate-90'}`} />
+                </div>
               </div>
               {showRented && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -178,12 +181,15 @@ export default function PropertyList({ properties, userId }: { properties: Prope
 
           {upcoming.length > 0 && (
             <div className="mb-8">
-              <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={() => setShowUpcoming(!showUpcoming)}>
+              <div className="flex items-center gap-2 mb-4 cursor-pointer group select-none" onClick={() => setShowUpcoming(!showUpcoming)}>
                 <h2 className="text-lg font-semibold text-slate-700">À venir</h2>
                 <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
                   {upcoming.length}
                 </span>
-                <ChevronDown className={`h-4 w-4 text-slate-400 ml-auto transition-transform ${showUpcoming ? '' : '-rotate-90'}`} />
+                <div className="ml-auto flex items-center gap-1.5 text-xs text-slate-400 group-hover:text-slate-600 transition-colors">
+                  <span>{showUpcoming ? 'Masquer' : 'Afficher'}</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showUpcoming ? '' : '-rotate-90'}`} />
+                </div>
               </div>
               {showUpcoming && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -195,12 +201,15 @@ export default function PropertyList({ properties, userId }: { properties: Prope
 
           {vacant.length > 0 && (
             <div className="mb-8">
-              <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={() => setShowVacant(!showVacant)}>
+              <div className="flex items-center gap-2 mb-4 cursor-pointer group select-none" onClick={() => setShowVacant(!showVacant)}>
                 <h2 className="text-lg font-semibold text-slate-700">Vacant</h2>
                 <span className="bg-slate-100 text-slate-600 text-xs font-medium px-2 py-0.5 rounded-full">
                   {vacant.length}
                 </span>
-                <ChevronDown className={`h-4 w-4 text-slate-400 ml-auto transition-transform ${showVacant ? '' : '-rotate-90'}`} />
+                <div className="ml-auto flex items-center gap-1.5 text-xs text-slate-400 group-hover:text-slate-600 transition-colors">
+                  <span>{showVacant ? 'Masquer' : 'Afficher'}</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showVacant ? '' : '-rotate-90'}`} />
+                </div>
               </div>
               {showVacant && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
