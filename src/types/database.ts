@@ -39,7 +39,7 @@ export type Tenant = {
   phone: string | null
   entry_date: string | null
   lease_end_date: string | null
-  status: 'draft' | 'active'
+  status: 'draft' | 'active' | 'upcoming' | 'inactive' | 'pending_signature' | 'lease_signed'
   tacite_reconduction: boolean
   created_at: string
   updated_at: string
