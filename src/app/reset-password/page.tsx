@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -9,36 +9,8 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [sessionReady, setSessionReady] = useState(false)
-  const [checking, setChecking] = useState(true)
   const router = useRouter()
   const supabase = createClient()
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth event:', event, 'Session:', !!session)
-      if (event === 'PASSWORD_RECOVERY') {
-        setSessionReady(true)
-        setChecking(false)
-      } else if (event === 'SIGNED_IN' && session) {
-        setSessionReady(true)
-        setChecking(false)
-      }
-    })
-
-    const timeout = setTimeout(() => {
-      setChecking(false)
-      if (!sessionReady) {
-        setError('Lien invalide ou expiré. Veuillez faire une nouvelle demande.')
-      }
-    }, 3000)
-
-    return () => {
-      subscription.unsubscribe()
-      clearTimeout(timeout)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,7 +20,6 @@ export default function ResetPasswordPage() {
       setError('Les mots de passe ne correspondent pas')
       return
     }
-
     if (password.length < 8) {
       setError('Le mot de passe doit contenir au moins 8 caractères')
       return
@@ -63,6 +34,7 @@ export default function ResetPasswordPage() {
       return
     }
 
+    await supabase.auth.signOut()
     router.push('/login?message=password_updated')
   }
 
@@ -73,14 +45,6 @@ export default function ResetPasswordPage() {
   }
 
   const strength = getStrength(password)
-
-  if (checking) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', fontFamily: 'Arial' }}>
-        <p>Vérification du lien en cours...</p>
-      </div>
-    )
-  }
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f9fafb', fontFamily: 'Arial' }}>
@@ -99,53 +63,49 @@ export default function ResetPasswordPage() {
             </div>
           )}
 
-          {sessionReady ? (
-            <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px' }}>
-                  Nouveau mot de passe
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
-                  required
-                />
-                {password && (
-                  <div style={{ marginTop: '8px' }}>
-                    <div style={{ height: '4px', backgroundColor: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: strength.width, backgroundColor: strength.color, transition: 'width 0.3s' }} />
-                    </div>
-                    <p style={{ fontSize: '12px', color: strength.color, marginTop: '4px' }}>Force : {strength.label}</p>
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px' }}>
+                Nouveau mot de passe
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                required
+              />
+              {password && (
+                <div style={{ marginTop: '8px' }}>
+                  <div style={{ height: '4px', backgroundColor: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: strength.width, backgroundColor: strength.color, transition: 'width 0.3s' }} />
                   </div>
-                )}
-              </div>
+                  <p style={{ fontSize: '12px', color: strength.color, marginTop: '4px' }}>Force : {strength.label}</p>
+                </div>
+              )}
+            </div>
 
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px' }}>
-                  Confirmer le mot de passe
-                </label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
-                  required
-                />
-              </div>
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px' }}>
+                Confirmer le mot de passe
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                required
+              />
+            </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                style={{ width: '100%', padding: '12px', backgroundColor: '#CFFF92', color: '#063B26', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
-              >
-                {loading ? 'Mise à jour...' : 'Réinitialiser le mot de passe'}
-              </button>
-            </form>
-          ) : (
-            <p style={{ color: '#dc2626' }}>{error}</p>
-          )}
+            <button
+              type="submit"
+              disabled={loading}
+              style={{ width: '100%', padding: '12px', backgroundColor: '#CFFF92', color: '#063B26', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
+            >
+              {loading ? 'Mise à jour...' : 'Réinitialiser le mot de passe'}
+            </button>
+          </form>
 
           <div style={{ textAlign: 'center', marginTop: '16px' }}>
             <a href="/login" style={{ color: '#6b7280', fontSize: '14px', textDecoration: 'none' }}>← Retour à la connexion</a>
