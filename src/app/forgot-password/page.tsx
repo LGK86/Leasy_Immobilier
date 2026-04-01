@@ -53,7 +53,7 @@ export default function ForgotPasswordPage() {
               <div className="flex items-start gap-3 rounded-lg bg-emerald-50 border border-emerald-200 p-4">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-emerald-800">
-                  Si un compte existe avec cet email, vous recevrez un lien de réinitialisation dans quelques minutes.
+                  Si un compte existe avec cet email, vous recevrez un lien de réinitialisation dans quelques minutes. Vérifiez également vos spams.
                 </p>
               </div>
             </CardContent>
