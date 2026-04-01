@@ -4,9 +4,9 @@ import { CheckCircle2, Circle, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const STEPS = [
-  'Ajouter votre premier bien',
+  'Ajouter un bien',
   'Ajouter un locataire',
-  'Créer votre premier bail',
+  'Créer un bail',
 ]
 
 interface Props {
@@ -35,7 +35,7 @@ export default function OnboardingBanner({ step, onOpen }: Props) {
               />
             </div>
             <span className="text-xs flex-shrink-0" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              {step}/3
+              {safeStep}/3
             </span>
           </div>
           <div className="flex gap-6 flex-wrap">
