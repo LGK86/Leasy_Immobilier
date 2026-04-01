@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Building2, MapPin, Euro, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Building2, MapPin, Euro, Pencil, Trash2, ChevronDown } from 'lucide-react'
 import PropertyForm from './PropertyForm'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -51,6 +51,9 @@ export default function PropertyList({ properties, userId }: { properties: Prope
   const [open, setOpen] = useState(false)
   const [editProperty, setEditProperty] = useState<Property | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [showRented, setShowRented] = useState(true)
+  const [showUpcoming, setShowUpcoming] = useState(true)
+  const [showVacant, setShowVacant] = useState(true)
   const router = useRouter()
   const supabase = createClient()
 
@@ -158,43 +161,52 @@ export default function PropertyList({ properties, userId }: { properties: Prope
         <div>
           {rented.length > 0 && (
             <div className="mb-8">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={() => setShowRented(!showRented)}>
                 <h2 className="text-lg font-semibold text-slate-700">Loué</h2>
                 <span className="bg-emerald-100 text-emerald-700 text-xs font-medium px-2 py-0.5 rounded-full">
                   {rented.length}
                 </span>
+                <ChevronDown className={`h-4 w-4 text-slate-400 ml-auto transition-transform ${showRented ? '' : '-rotate-90'}`} />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {rented.map(p => <PropertyCard key={p.id} property={p} />)}
-              </div>
+              {showRented && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {rented.map(p => <PropertyCard key={p.id} property={p} />)}
+                </div>
+              )}
             </div>
           )}
 
           {upcoming.length > 0 && (
             <div className="mb-8">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={() => setShowUpcoming(!showUpcoming)}>
                 <h2 className="text-lg font-semibold text-slate-700">À venir</h2>
                 <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
                   {upcoming.length}
                 </span>
+                <ChevronDown className={`h-4 w-4 text-slate-400 ml-auto transition-transform ${showUpcoming ? '' : '-rotate-90'}`} />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {upcoming.map(p => <PropertyCard key={p.id} property={p} />)}
-              </div>
+              {showUpcoming && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {upcoming.map(p => <PropertyCard key={p.id} property={p} />)}
+                </div>
+              )}
             </div>
           )}
 
           {vacant.length > 0 && (
             <div className="mb-8">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={() => setShowVacant(!showVacant)}>
                 <h2 className="text-lg font-semibold text-slate-700">Vacant</h2>
                 <span className="bg-slate-100 text-slate-600 text-xs font-medium px-2 py-0.5 rounded-full">
                   {vacant.length}
                 </span>
+                <ChevronDown className={`h-4 w-4 text-slate-400 ml-auto transition-transform ${showVacant ? '' : '-rotate-90'}`} />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {vacant.map(p => <PropertyCard key={p.id} property={p} />)}
-              </div>
+              {showVacant && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {vacant.map(p => <PropertyCard key={p.id} property={p} />)}
+                </div>
+              )}
             </div>
           )}
         </div>
