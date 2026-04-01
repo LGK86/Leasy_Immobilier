@@ -24,8 +24,6 @@ export default function OnboardingContainer({ initialStep, userId, initialProper
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (step >= 3) return null
-
   return (
     <>
       <OnboardingBanner step={step} onOpen={() => setShowWizard(true)} />

@@ -18,11 +18,16 @@ type TenantEntry  = { id: string; first_name: string; last_name: string; propert
 
 interface Props {
   doc: any | null
-  onSave: (content: Record<string, string>) => void
+  onSave?: (content: Record<string, string>) => void
   onDocCreated?: (doc: any) => void
   properties?: { id: string; address: string; city: string }[]
   tenants?: TenantEntry[]
   userId?: string
+  preselectedPropertyId?: string
+  preselectedTenantId?: string
+  onComplete?: () => void
+  onSkip?: () => void
+  isEmbedded?: boolean
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -169,7 +174,7 @@ function TA({ label, value, onChange, rows = 4, placeholder }: {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function DocumentWizard({ doc, onSave, onDocCreated, properties = [], tenants = [], userId }: Props) {
+export default function DocumentWizard({ doc, onSave, onDocCreated, properties = [], tenants = [], userId, preselectedPropertyId, preselectedTenantId, onComplete, onSkip, isEmbedded = false }: Props) {
   const supabase = createClient()
   const docType = doc?.type ?? 'lease'
 
@@ -189,8 +194,13 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
 
   // Lease-specific state
   const [docId, setDocId]               = useState<string | null>(doc?.id ?? null)
-  const [propertyId, setPropertyId]     = useState<string | null>(doc?.property_id ?? null)
-  const [tenantIds, setTenantIds]       = useState<string[]>(() => initTenantIds(doc?.content))
+  const [propertyId, setPropertyId]     = useState<string | null>(doc?.property_id ?? preselectedPropertyId ?? null)
+  const [tenantIds, setTenantIds]       = useState<string[]>(() => {
+    const fromDoc = initTenantIds(doc?.content)
+    if (fromDoc.length > 0) return fromDoc
+    if (preselectedTenantId) return [preselectedTenantId]
+    return []
+  })
   const [localTenants, setLocalTenants] = useState<TenantEntry[]>(tenants)
   const [splitRent, setSplitRent]       = useState(false)
   const [rentSplit, setRentSplit]       = useState<Record<string, number>>({})
@@ -244,6 +254,12 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
   }, [])
 
   useEffect(() => { setLocalTenants(tenants) }, [tenants])
+
+  // Pré-remplir depuis les IDs pré-sélectionnés (exécuté une seule fois au montage)
+  useEffect(() => {
+    if (preselectedPropertyId) handlePropertyChange(preselectedPropertyId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const f = (key: string) => (value: string) => setForm(prev => ({ ...prev, [key]: value }))
 
@@ -450,7 +466,8 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
     }
     autoSave()
     if (section < total) setSection(s => s + 1)
-    else onSave(buildFinalContent())
+    else if (isEmbedded && onComplete) onComplete()
+    else onSave?.(buildFinalContent())
   }
 
   // ── Progress bar ──────────────────────────────────────────────────────────
@@ -487,8 +504,13 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
         className="text-[#063B26] font-semibold disabled:opacity-50"
         style={{ backgroundColor: '#CFFF92' }}
       >
-        {section < total ? 'Suivant' : 'Enregistrer et continuer'}
+        {section < total ? 'Suivant' : (isEmbedded ? 'Créer ce bail →' : 'Enregistrer et continuer')}
       </Button>
+      {isEmbedded && onSkip && (
+        <Button variant="ghost" onClick={onSkip} className="text-slate-400 text-sm">
+          Passer
+        </Button>
+      )}
     </div>
   )
 

@@ -16,9 +16,8 @@ interface Props {
 
 export default function OnboardingBanner({ step, onOpen }: Props) {
   const safeStep = typeof step === 'number' && step >= 0 ? step : 0
-  if (safeStep >= 3) return null
-
-  const progress = Math.round((safeStep / 3) * 100)
+  const completed = safeStep >= 3
+  const progress = completed ? 100 : Math.round((safeStep / 3) * 100)
 
   return (
     <div className="rounded-xl p-5 mb-6" style={{ backgroundColor: '#063B26' }}>
@@ -57,7 +56,7 @@ export default function OnboardingBanner({ step, onOpen }: Props) {
           className="flex-shrink-0 font-semibold text-[#063B26] hover:opacity-90"
           style={{ backgroundColor: '#CFFF92' }}
         >
-          Continuer
+          {completed ? 'Revoir le guide' : 'Continuer'}
           <ChevronRight className="h-4 w-4 ml-1" />
         </Button>
       </div>
