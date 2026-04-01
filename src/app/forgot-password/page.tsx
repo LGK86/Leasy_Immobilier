@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,25 +12,19 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
-  const [error, setError] = useState('')
-  const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
     setLoading(true)
 
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${base}/reset-password`,
+    await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     })
 
-    if (error) {
-      console.error('Supabase reset error:', JSON.stringify(error))
-      setError(`Erreur: ${error.message} (status: ${error.status})`)
-    } else {
-      setSent(true)
-    }
+    // Toujours afficher le succès — ne pas exposer l'existence du compte
+    setSent(true)
     setLoading(false)
   }
 
@@ -60,8 +53,7 @@ export default function ForgotPasswordPage() {
               <div className="flex items-start gap-3 rounded-lg bg-emerald-50 border border-emerald-200 p-4">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-emerald-800">
-                  Un email de réinitialisation a été envoyé à{' '}
-                  <span className="font-semibold">{email}</span>. Vérifiez votre boîte mail.
+                  Si un compte existe avec cet email, vous recevrez un lien de réinitialisation dans quelques minutes.
                 </p>
               </div>
             </CardContent>
@@ -79,9 +71,6 @@ export default function ForgotPasswordPage() {
                     required
                   />
                 </div>
-                {error && (
-                  <p className="text-sm text-red-600">{error}</p>
-                )}
               </CardContent>
               <CardFooter className="flex flex-col gap-4 mt-2">
                 <Button type="submit" className="w-full" disabled={loading}>
