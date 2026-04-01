@@ -5,17 +5,19 @@ import OnboardingBanner from './OnboardingBanner'
 import OnboardingWizard from './OnboardingWizard'
 
 interface Props {
-  initialStep: number
+  initialStep: number | null | undefined
   userId: string
   initialProperties: { id: string; address: string; city: string }[]
 }
 
 export default function OnboardingContainer({ initialStep, userId, initialProperties }: Props) {
-  const [step, setStep] = useState(initialStep)
+  const [step, setStep] = useState<number>(
+    typeof initialStep === 'number' && initialStep >= 0 ? initialStep : 0
+  )
   const [showWizard, setShowWizard] = useState(false)
 
   useEffect(() => {
-    if (initialStep < 3 && !sessionStorage.getItem('leasy_onboarding_shown')) {
+    if ((initialStep ?? 0) < 3 && !sessionStorage.getItem('leasy_onboarding_shown')) {
       sessionStorage.setItem('leasy_onboarding_shown', '1')
       setShowWizard(true)
     }

@@ -10,14 +10,15 @@ const STEPS = [
 ]
 
 interface Props {
-  step: number
+  step: number | null | undefined
   onOpen: () => void
 }
 
 export default function OnboardingBanner({ step, onOpen }: Props) {
-  if (step >= 3) return null
+  const safeStep = typeof step === 'number' && step >= 0 ? step : 0
+  if (safeStep >= 3) return null
 
-  const progress = Math.round((step / 3) * 100)
+  const progress = Math.round((safeStep / 3) * 100)
 
   return (
     <div className="rounded-xl p-5 mb-6" style={{ backgroundColor: '#063B26' }}>
@@ -40,11 +41,11 @@ export default function OnboardingBanner({ step, onOpen }: Props) {
           <div className="flex gap-6 flex-wrap">
             {STEPS.map((label, i) => (
               <div key={i} className="flex items-center gap-1.5 text-sm">
-                {i < step
+                {i < safeStep
                   ? <CheckCircle2 className="h-4 w-4 flex-shrink-0" style={{ color: '#CFFF92' }} />
                   : <Circle className="h-4 w-4 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.35)' }} />
                 }
-                <span style={{ color: i < step ? 'rgba(255,255,255,0.5)' : 'white', textDecoration: i < step ? 'line-through' : 'none' }}>
+                <span style={{ color: i < safeStep ? 'rgba(255,255,255,0.5)' : 'white', textDecoration: i < safeStep ? 'line-through' : 'none' }}>
                   {label}
                 </span>
               </div>

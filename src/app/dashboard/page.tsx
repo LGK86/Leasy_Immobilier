@@ -24,7 +24,7 @@ export default async function DashboardPage() {
     { data: payments },
     { data: currentMonthPayments },
   ] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('profiles').select('*, onboarding_step, onboarding_completed').eq('id', user.id).single(),
     supabase.from('properties').select('*').eq('owner_id', user.id),
     supabase.from('properties').select('id, address, city').eq('owner_id', user.id),
     supabase.from('tenants').select('*').eq('owner_id', user.id),
@@ -86,17 +86,17 @@ export default async function DashboardPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header profile={profile} />
         <main className="flex-1 overflow-y-auto p-6">
-          <OnboardingContainer
-            initialStep={profile?.onboarding_step ?? 0}
-            userId={user.id}
-            initialProperties={onboardingProperties ?? []}
-          />
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-slate-800">
               Bonjour {profile?.first_name ?? ''} 👋
             </h1>
             <p className="text-slate-500 mt-1">Voici votre tableau de bord pour {monthName}</p>
           </div>
+          <OnboardingContainer
+            initialStep={profile?.onboarding_step}
+            userId={user.id}
+            initialProperties={onboardingProperties ?? []}
+          />
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {stats.map((stat) => (

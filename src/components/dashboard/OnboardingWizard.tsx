@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation'
 interface Props {
   open: boolean
   onClose: () => void
-  step: number
+  step: number | null | undefined
   userId: string
   initialProperties: { id: string; address: string; city: string }[]
   onStepComplete: (newStep: number) => void
@@ -78,7 +78,8 @@ export default function OnboardingWizard({
     router.refresh()
   }
 
-  const displayStep = Math.min(step, 3)
+  const safeStep = typeof step === 'number' && step >= 0 ? step : 0
+  const displayStep = Math.min(safeStep, 3)
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
