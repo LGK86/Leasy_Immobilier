@@ -27,9 +27,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true })
     }
 
+    const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://app.leasy-immo.fr'
     const actionLink = data.properties.action_link.replace(
       /redirect_to=[^&]*/,
-      `redirect_to=${encodeURIComponent(process.env.APP_URL + '/reset-password')}`
+      `redirect_to=${encodeURIComponent(appUrl + '/reset-password')}`
     )
 
     await resend.emails.send({
