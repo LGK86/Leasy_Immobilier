@@ -201,16 +201,34 @@ export async function POST(req: Request) {
       }
     } catch { /* ignore PDF/email errors — signature is already saved */ }
 
+    // Fetch owner profile for email preferences
+    const { data: ownerProfile } = await serviceClient
+      .from('profiles')
+      .select('notif_email_document_signed, notif_email_document_finalized, email')
+      .eq('id', doc.owner_id)
+      .single()
+
     // Notify owner that document is fully signed
     try {
       await serviceClient.from('notifications').insert({
-        user_id: doc.owner_id,
+        owner_id: doc.owner_id,
         type: 'document_signed',
-        title: 'Bail signé — toutes les parties',
-        body: `"${doc.title}" a été signé par tous les locataires.`,
-        metadata: { document_id: doc.id },
+        title: 'Document finalise',
+        message: `"${doc.title}" a ete signe par tous les locataires.`,
       })
     } catch { /* ignore */ }
+
+    // Send email to owner if preference enabled
+    if (ownerProfile?.notif_email_document_finalized && ownerProfile?.email) {
+      try {
+        await resend.emails.send({
+          from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
+          to: ownerProfile.email,
+          subject: `Document finalise - ${doc.title}`,
+          html: `<p>Le document "${doc.title}" a ete signe par tous les locataires.</p>`,
+        })
+      } catch { /* ignore */ }
+    }
 
   } else {
     // Partial signing — update signatures but keep pending status
@@ -240,11 +258,10 @@ export async function POST(req: Request) {
         : 'Un locataire'
 
       await serviceClient.from('notifications').insert({
-        user_id: doc.owner_id,
+        owner_id: doc.owner_id,
         type: 'document_signed',
-        title: 'Signature partielle du bail',
-        body: `${tenantFullName} a signé "${doc.title}" (${signedCount}/${totalCount} locataires).`,
-        metadata: { document_id: doc.id },
+        title: 'Signature recue',
+        message: `${tenantFullName} a signe "${doc.title}" (${signedCount}/${totalCount} locataires).`,
       })
     } catch { /* ignore */ }
   }

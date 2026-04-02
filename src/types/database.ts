@@ -7,6 +7,10 @@ export type Profile = {
   address: string | null
   city: string | null
   postal_code: string | null
+  notif_email_document_signed: boolean | null
+  notif_email_document_finalized: boolean | null
+  notif_email_payment_received: boolean | null
+  notif_email_receipt_generated: boolean | null
   created_at: string
   updated_at: string
 }

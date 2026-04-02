@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Separator } from '@/components/ui/separator'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Loader2, User, MapPin, Lock } from 'lucide-react'
+import { Loader2, User, MapPin, Lock, Bell } from 'lucide-react'
 import type { Profile } from '@/types/database'
 
 function getPasswordStrength(password: string) {
@@ -41,6 +41,12 @@ export default function SettingsForm({ profile, userId }: Props) {
     city: profile?.city ?? '',
     postal_code: profile?.postal_code ?? '',
   })
+  const [notifPrefs, setNotifPrefs] = useState({
+    notif_email_document_signed: profile?.notif_email_document_signed ?? true,
+    notif_email_document_finalized: profile?.notif_email_document_finalized ?? true,
+    notif_email_payment_received: profile?.notif_email_payment_received ?? true,
+    notif_email_receipt_generated: profile?.notif_email_receipt_generated ?? false,
+  })
   const [pwForm, setPwForm] = useState({ current: '', new: '', confirm: '' })
   const [pwErrors, setPwErrors] = useState<{ current?: string; new?: string; confirm?: string }>({})
   const strength = pwForm.new ? getPasswordStrength(pwForm.new) : null
@@ -58,6 +64,14 @@ export default function SettingsForm({ profile, userId }: Props) {
     })
     if (error) toast.error('Erreur : ' + error.message)
     else toast.success('Profil mis à jour')
+    setLoading(false)
+  }
+
+  const handleSaveNotifPrefs = async () => {
+    setLoading(true)
+    const { error } = await supabase.from('profiles').update(notifPrefs).eq('id', userId)
+    if (error) toast.error('Erreur : ' + error.message)
+    else toast.success('Preferences enregistrees')
     setLoading(false)
   }
 
@@ -215,6 +229,40 @@ export default function SettingsForm({ profile, userId }: Props) {
               Mettre à jour le mot de passe
             </Button>
           </form>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Bell className="h-5 w-5 text-blue-600" />
+            <CardTitle className="text-base">Notifications par email</CardTitle>
+          </div>
+          <CardDescription>
+            Choisissez les evenements pour lesquels vous souhaitez recevoir un email.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[
+              { key: 'notif_email_document_signed', label: 'Signature d\'un document par un locataire' },
+              { key: 'notif_email_document_finalized', label: 'Finalisation d\'un document' },
+              { key: 'notif_email_payment_received', label: 'Reception d\'un paiement' },
+              { key: 'notif_email_receipt_generated', label: 'Generation d\'une quittance' },
+            ].map(({ key, label }) => (
+              <div key={key} className="flex items-center justify-between">
+                <Label className="text-sm text-slate-700">{label}</Label>
+                <input
+                  type="checkbox"
+                  checked={notifPrefs[key as keyof typeof notifPrefs] ?? false}
+                  onChange={e => setNotifPrefs(p => ({ ...p, [key]: e.target.checked }))}
+                  className="h-4 w-4 accent-[#063B26]"
+                />
+              </div>
+            ))}
+            <Button onClick={handleSaveNotifPrefs} disabled={loading}>
+              Enregistrer les preferences
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

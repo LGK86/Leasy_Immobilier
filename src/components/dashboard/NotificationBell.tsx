@@ -35,6 +35,23 @@ export default function NotificationBell({ userId }: { userId: string }) {
     return () => clearInterval(interval)
   }, [fetchNotifications])
 
+  // Realtime — new notifications pushed instantly
+  useEffect(() => {
+    const channel = supabase
+      .channel('notifications-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `owner_id=eq.${userId}`,
+      }, (payload) => {
+        setNotifications(prev => [payload.new as Notification, ...prev.slice(0, 19)])
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [userId, supabase])
+
   // Close on outside click
   useEffect(() => {
     if (!open) return

@@ -105,6 +105,26 @@ export async function POST(request: NextRequest) {
 
   await supabase.from('documents').update(updates).eq('id', documentId)
 
+  // Notification document envoyé pour signature
+  if (sendEmail) {
+    await supabase.from('notifications').insert({
+      owner_id: user.id,
+      type: 'document_sent',
+      title: 'Document envoye pour signature',
+      message: `"${doc.title}" a ete envoye aux locataires pour signature.`,
+    })
+  }
+
+  // Notification document finalisé
+  if (doc.owner_signature && doc.tenant_signature) {
+    await supabase.from('notifications').insert({
+      owner_id: user.id,
+      type: 'document_finalized',
+      title: 'Document finalise',
+      message: `"${doc.title}" a ete finalise avec succes.`,
+    })
+  }
+
   // Sync property surface/rooms_count from lease content
   if (doc.type === 'lease' && doc.property_id) {
     const surface = parseFloat(doc.content?.['Surface habitable'] || doc.content?.['Surface'] || '')
