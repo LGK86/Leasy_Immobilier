@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
   await supabase.from('documents').update(updates).eq('id', documentId)
 
   // Notification document envoyé pour signature
-  if (sendEmail) {
+  if (sendEmail && profile?.notif_app_document_signed !== false) {
     await supabase.from('notifications').insert({
       owner_id: user.id,
       type: 'document_sent',
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Notification document finalisé
-  if (doc.owner_signature && doc.tenant_signature) {
+  if (doc.owner_signature && doc.tenant_signature && profile?.notif_app_document_finalized !== false) {
     await supabase.from('notifications').insert({
       owner_id: user.id,
       type: 'document_finalized',

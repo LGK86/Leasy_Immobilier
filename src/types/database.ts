@@ -11,6 +11,10 @@ export type Profile = {
   notif_email_document_finalized: boolean | null
   notif_email_payment_received: boolean | null
   notif_email_receipt_generated: boolean | null
+  notif_app_document_signed: boolean | null
+  notif_app_document_finalized: boolean | null
+  notif_app_payment_received: boolean | null
+  notif_app_receipt_generated: boolean | null
   created_at: string
   updated_at: string
 }

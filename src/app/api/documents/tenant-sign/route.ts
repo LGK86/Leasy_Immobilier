@@ -70,6 +70,13 @@ export async function POST(req: Request) {
 
   const updatedContent = { ...(doc.content ?? {}), tenant_signatures: currentSigs }
 
+  // Fetch owner profile once — needed in both branches for prefs and email
+  const { data: ownerProfile } = await serviceClient
+    .from('profiles')
+    .select('email, notif_email_document_signed, notif_email_document_finalized, notif_app_document_signed, notif_app_document_finalized')
+    .eq('id', doc.owner_id)
+    .single()
+
   if (allSigned) {
     // Finalize document
     const { error: updateErr } = await serviceClient
@@ -201,31 +208,41 @@ export async function POST(req: Request) {
       }
     } catch { /* ignore PDF/email errors — signature is already saved */ }
 
-    // Fetch owner profile for email preferences
-    const { data: ownerProfile } = await serviceClient
-      .from('profiles')
-      .select('notif_email_document_signed, notif_email_document_finalized, email')
-      .eq('id', doc.owner_id)
-      .single()
+    // Notify owner — document fully signed (in-app)
+    if (ownerProfile?.notif_app_document_finalized !== false) {
+      try {
+        await serviceClient.from('notifications').insert({
+          owner_id: doc.owner_id,
+          type: 'document_signed',
+          title: 'Document finalise',
+          message: `"${doc.title}" a ete signe par tous les locataires.`,
+        })
+      } catch { /* ignore */ }
+    }
 
-    // Notify owner that document is fully signed
-    try {
-      await serviceClient.from('notifications').insert({
-        owner_id: doc.owner_id,
-        type: 'document_signed',
-        title: 'Document finalise',
-        message: `"${doc.title}" a ete signe par tous les locataires.`,
-      })
-    } catch { /* ignore */ }
-
-    // Send email to owner if preference enabled
+    // Email au propriétaire si préférence activée
     if (ownerProfile?.notif_email_document_finalized && ownerProfile?.email) {
       try {
         await resend.emails.send({
           from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
           to: ownerProfile.email,
           subject: `Document finalise - ${doc.title}`,
-          html: `<p>Le document "${doc.title}" a ete signe par tous les locataires.</p>`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #063B26; padding: 24px; border-radius: 8px 8px 0 0;">
+                <h1 style="color: #CFFF92; margin: 0; font-size: 20px;">Leasy Immobilier</h1>
+              </div>
+              <div style="padding: 24px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
+                <p>Bonjour,</p>
+                <p>Le document <strong>${doc.title}</strong> a ete signe par tous les locataires.</p>
+                <p>Connectez-vous a votre espace Leasy pour le consulter.</p>
+                <a href="${process.env.APP_URL ?? 'https://app.leasy-immo.fr'}/documents"
+                   style="display: inline-block; background-color: #CFFF92; color: #063B26; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+                  Voir le document
+                </a>
+              </div>
+            </div>
+          `,
         })
       } catch { /* ignore */ }
     }
@@ -243,7 +260,7 @@ export async function POST(req: Request) {
 
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
-    // Notify owner that one tenant signed but others are pending
+    // Notify owner — partial signature
     try {
       const { data: signingTenantData } = await serviceClient
         .from('tenants')
@@ -257,12 +274,37 @@ export async function POST(req: Request) {
         ? `${signingTenantData.first_name} ${signingTenantData.last_name}`
         : 'Un locataire'
 
-      await serviceClient.from('notifications').insert({
-        owner_id: doc.owner_id,
-        type: 'document_signed',
-        title: 'Signature recue',
-        message: `${tenantFullName} a signe "${doc.title}" (${signedCount}/${totalCount} locataires).`,
-      })
+      if (ownerProfile?.notif_app_document_signed !== false) {
+        await serviceClient.from('notifications').insert({
+          owner_id: doc.owner_id,
+          type: 'document_signed',
+          title: 'Signature recue',
+          message: `${tenantFullName} a signe "${doc.title}" (${signedCount}/${totalCount} locataires).`,
+        })
+      }
+
+      if (ownerProfile?.notif_email_document_signed && ownerProfile?.email) {
+        await resend.emails.send({
+          from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
+          to: ownerProfile.email,
+          subject: `Signature recue - ${doc.title}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #063B26; padding: 24px; border-radius: 8px 8px 0 0;">
+                <h1 style="color: #CFFF92; margin: 0; font-size: 20px;">Leasy Immobilier</h1>
+              </div>
+              <div style="padding: 24px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
+                <p>Bonjour,</p>
+                <p>${tenantFullName} a signe le document <strong>${doc.title}</strong> (${signedCount}/${totalCount} locataires).</p>
+                <a href="${process.env.APP_URL ?? 'https://app.leasy-immo.fr'}/documents"
+                   style="display: inline-block; background-color: #CFFF92; color: #063B26; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+                  Voir le document
+                </a>
+              </div>
+            </div>
+          `,
+        })
+      }
     } catch { /* ignore */ }
   }
 

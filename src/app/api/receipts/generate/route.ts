@@ -152,14 +152,16 @@ export async function POST(request: NextRequest) {
 
     console.log('[receipt/generate] receipt saved, id:', receiptId)
 
-    // Notification quittance générée
+    // Notification quittance générée (si préférence in-app activée)
     const MONTHS_FR_NOTIF = ['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre']
-    await supabase.from('notifications').insert({
-      owner_id: user.id,
-      type: 'receipt_generated',
-      title: 'Quittance generee',
-      message: `Quittance de ${tenant.first_name} ${tenant.last_name} pour ${MONTHS_FR_NOTIF[Number(periodMonth) - 1]} ${periodYear} generee.`,
-    })
+    if (profile?.notif_app_receipt_generated !== false) {
+      await supabase.from('notifications').insert({
+        owner_id: user.id,
+        type: 'receipt_generated',
+        title: 'Quittance generee',
+        message: `Quittance de ${tenant.first_name} ${tenant.last_name} pour ${MONTHS_FR_NOTIF[Number(periodMonth) - 1]} ${periodYear} generee.`,
+      })
+    }
 
     // Invalidate receipts page cache so router.refresh() sees fresh data
     revalidatePath('/receipts')

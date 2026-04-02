@@ -46,6 +46,10 @@ export default function SettingsForm({ profile, userId }: Props) {
     notif_email_document_finalized: profile?.notif_email_document_finalized ?? true,
     notif_email_payment_received: profile?.notif_email_payment_received ?? true,
     notif_email_receipt_generated: profile?.notif_email_receipt_generated ?? false,
+    notif_app_document_signed: profile?.notif_app_document_signed ?? true,
+    notif_app_document_finalized: profile?.notif_app_document_finalized ?? true,
+    notif_app_payment_received: profile?.notif_app_payment_received ?? true,
+    notif_app_receipt_generated: profile?.notif_app_receipt_generated ?? true,
   })
   const [pwForm, setPwForm] = useState({ current: '', new: '', confirm: '' })
   const [pwErrors, setPwErrors] = useState<{ current?: string; new?: string; confirm?: string }>({})
@@ -235,30 +239,65 @@ export default function SettingsForm({ profile, userId }: Props) {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Bell className="h-5 w-5 text-blue-600" />
-            <CardTitle className="text-base">Notifications par email</CardTitle>
+            <CardTitle className="text-base">Notifications</CardTitle>
           </div>
           <CardDescription>
-            Choisissez les evenements pour lesquels vous souhaitez recevoir un email.
+            Gerez vos preferences de notifications in-app et par email.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {[
-              { key: 'notif_email_document_signed', label: 'Signature d\'un document par un locataire' },
-              { key: 'notif_email_document_finalized', label: 'Finalisation d\'un document' },
-              { key: 'notif_email_payment_received', label: 'Reception d\'un paiement' },
-              { key: 'notif_email_receipt_generated', label: 'Generation d\'une quittance' },
-            ].map(({ key, label }) => (
-              <div key={key} className="flex items-center justify-between">
-                <Label className="text-sm text-slate-700">{label}</Label>
-                <input
-                  type="checkbox"
-                  checked={notifPrefs[key as keyof typeof notifPrefs] ?? false}
-                  onChange={e => setNotifPrefs(p => ({ ...p, [key]: e.target.checked }))}
-                  className="h-4 w-4 accent-[#063B26]"
-                />
+          <div className="space-y-6">
+            <div>
+              <div className="grid grid-cols-3 gap-4 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                <div className="col-span-1">Evenement</div>
+                <div className="text-center">In-app</div>
+                <div className="text-center">Email</div>
               </div>
-            ))}
+              <div className="space-y-1">
+                {[
+                  {
+                    label: "Signature d'un document",
+                    appKey: 'notif_app_document_signed',
+                    emailKey: 'notif_email_document_signed',
+                  },
+                  {
+                    label: "Finalisation d'un document",
+                    appKey: 'notif_app_document_finalized',
+                    emailKey: 'notif_email_document_finalized',
+                  },
+                  {
+                    label: "Reception d'un paiement",
+                    appKey: 'notif_app_payment_received',
+                    emailKey: 'notif_email_payment_received',
+                  },
+                  {
+                    label: "Generation d'une quittance",
+                    appKey: 'notif_app_receipt_generated',
+                    emailKey: 'notif_email_receipt_generated',
+                  },
+                ].map(({ label, appKey, emailKey }) => (
+                  <div key={appKey} className="grid grid-cols-3 gap-4 items-center py-2 border-b border-slate-100 last:border-0">
+                    <div className="text-sm text-slate-700">{label}</div>
+                    <div className="flex justify-center">
+                      <input
+                        type="checkbox"
+                        checked={(notifPrefs[appKey as keyof typeof notifPrefs] as boolean) ?? false}
+                        onChange={e => setNotifPrefs(p => ({ ...p, [appKey]: e.target.checked }))}
+                        className="h-4 w-4 accent-[#063B26]"
+                      />
+                    </div>
+                    <div className="flex justify-center">
+                      <input
+                        type="checkbox"
+                        checked={(notifPrefs[emailKey as keyof typeof notifPrefs] as boolean) ?? false}
+                        onChange={e => setNotifPrefs(p => ({ ...p, [emailKey]: e.target.checked }))}
+                        className="h-4 w-4 accent-[#063B26]"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
             <Button onClick={handleSaveNotifPrefs} disabled={loading}>
               Enregistrer les preferences
             </Button>
