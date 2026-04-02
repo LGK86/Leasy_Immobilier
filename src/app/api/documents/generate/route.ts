@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
     await supabase.from('notifications').insert({
       owner_id: user.id,
       type: 'document_sent',
-      title: 'Document envoye pour signature',
-      message: `"${doc.title}" a ete envoye aux locataires pour signature.`,
+      title: 'Document envoyé pour signature',
+      message: `"${doc.title}" a été envoyé aux locataires pour signature.`,
       link_url: '/documents',
     })
   }
@@ -121,8 +121,8 @@ export async function POST(request: NextRequest) {
     await supabase.from('notifications').insert({
       owner_id: user.id,
       type: 'document_finalized',
-      title: 'Document finalise',
-      message: `"${doc.title}" a ete finalise avec succes.`,
+      title: 'Document finalisé',
+      message: `"${doc.title}" a été finalisé avec succès.`,
       link_url: '/documents',
     })
   }
