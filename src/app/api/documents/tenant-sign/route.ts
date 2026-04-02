@@ -216,6 +216,7 @@ export async function POST(req: Request) {
           type: 'document_signed',
           title: 'Document finalise',
           message: `"${doc.title}" a ete signe par tous les locataires.`,
+          link_url: '/documents',
         })
       } catch { /* ignore */ }
     }
@@ -280,6 +281,7 @@ export async function POST(req: Request) {
           type: 'document_signed',
           title: 'Signature recue',
           message: `${tenantFullName} a signe "${doc.title}" (${signedCount}/${totalCount} locataires).`,
+          link_url: '/documents',
         })
       }
 

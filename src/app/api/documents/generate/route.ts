@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
       type: 'document_sent',
       title: 'Document envoye pour signature',
       message: `"${doc.title}" a ete envoye aux locataires pour signature.`,
+      link_url: '/documents',
     })
   }
 
@@ -122,6 +123,7 @@ export async function POST(request: NextRequest) {
       type: 'document_finalized',
       title: 'Document finalise',
       message: `"${doc.title}" a ete finalise avec succes.`,
+      link_url: '/documents',
     })
   }
 

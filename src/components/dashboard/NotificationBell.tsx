@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Bell } from 'lucide-react'
+import { Bell, ExternalLink } from 'lucide-react'
 
 interface Notification {
   id: string
@@ -11,6 +12,7 @@ interface Notification {
   message: string
   read: boolean
   created_at: string
+  link_url?: string
 }
 
 export default function NotificationBell({ userId }: { userId: string }) {
@@ -18,6 +20,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
+  const router = useRouter()
 
   const fetchNotifications = useCallback(async () => {
     const { data } = await supabase
@@ -76,6 +79,17 @@ export default function NotificationBell({ userId }: { userId: string }) {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
   }
 
+  const handleNotificationClick = async (n: Notification) => {
+    if (!n.read) {
+      await supabase.from('notifications').update({ read: true }).eq('id', n.id)
+      setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, read: true } : notif))
+    }
+    if (n.link_url) {
+      setOpen(false)
+      router.push(n.link_url)
+    }
+  }
+
   const formatDate = (iso: string) => {
     const d = new Date(iso)
     return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -120,16 +134,22 @@ export default function NotificationBell({ userId }: { userId: string }) {
               notifications.map((n) => (
                 <div
                   key={n.id}
-                  className={`px-4 py-3 ${!n.read ? 'bg-emerald-50' : 'bg-white'}`}
+                  onClick={() => handleNotificationClick(n)}
+                  className={`px-4 py-3 transition-colors ${!n.read ? 'bg-emerald-50' : 'bg-white'} ${n.link_url ? 'cursor-pointer hover:bg-slate-50' : ''}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-sm font-medium text-slate-800">{n.title}</p>
                       <p className="text-xs text-slate-500 mt-0.5">{n.message}</p>
                     </div>
-                    {!n.read && (
-                      <span className="mt-1 h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#063B26' }} />
-                    )}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {!n.read && (
+                        <span className="mt-1 h-2 w-2 rounded-full" style={{ backgroundColor: '#063B26' }} />
+                      )}
+                      {n.link_url && (
+                        <ExternalLink className="h-3 w-3 text-slate-400 mt-1" />
+                      )}
+                    </div>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1">{formatDate(n.created_at)}</p>
                 </div>

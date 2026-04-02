@@ -160,7 +160,35 @@ export async function POST(request: NextRequest) {
         type: 'receipt_generated',
         title: 'Quittance generee',
         message: `Quittance de ${tenant.first_name} ${tenant.last_name} pour ${MONTHS_FR_NOTIF[Number(periodMonth) - 1]} ${periodYear} generee.`,
+        link_url: '/receipts',
       })
+    }
+
+    // Email au propriétaire si préférence activée
+    if (profile?.notif_email_receipt_generated && profile?.email && process.env.RESEND_API_KEY) {
+      const monthLabelOwner = MONTHS_FR_NOTIF[Number(periodMonth) - 1] ?? String(periodMonth)
+      try {
+        await resend.emails.send({
+          from: 'Leasy Immobilier <noreply@leasy-immo.fr>',
+          to: profile.email,
+          subject: `Quittance generee - ${tenant.first_name} ${tenant.last_name}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #063B26; padding: 24px; border-radius: 8px 8px 0 0;">
+                <h1 style="color: #CFFF92; margin: 0; font-size: 20px;">Leasy Immobilier</h1>
+              </div>
+              <div style="padding: 24px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
+                <p>Bonjour,</p>
+                <p>La quittance de <strong>${tenant.first_name} ${tenant.last_name}</strong> pour <strong>${monthLabelOwner} ${periodYear}</strong> a ete generee.</p>
+                <a href="${process.env.APP_URL ?? 'https://app.leasy-immo.fr'}/receipts"
+                   style="display: inline-block; background-color: #CFFF92; color: #063B26; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-top: 16px;">
+                  Voir les quittances
+                </a>
+              </div>
+            </div>
+          `,
+        })
+      } catch { /* ignore */ }
     }
 
     // Invalidate receipts page cache so router.refresh() sees fresh data
