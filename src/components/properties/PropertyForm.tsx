@@ -33,7 +33,23 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
     description: property?.description ?? '',
     surface: property?.surface?.toString() ?? '',
     rooms_count: property?.rooms_count?.toString() ?? '',
+    construction_year: property?.construction_year?.toString() ?? '',
+    rental_type: property?.rental_type ?? 'unfurnished',
   })
+
+  const [rentControlResult, setRentControlResult] = useState<{
+    status: 'compliant' | 'non_compliant' | 'not_applicable' | null
+    ref_price?: number
+    max_price?: number
+    min_price?: number
+    zone_name?: string
+  } | null>(property?.rent_control_status ? {
+    status: property.rent_control_status as 'compliant' | 'non_compliant' | 'not_applicable',
+    ref_price: property.rent_control_reference ?? undefined,
+    max_price: property.rent_control_max ?? undefined,
+    min_price: property.rent_control_min ?? undefined,
+  } : null)
+  const [checkingRentControl, setCheckingRentControl] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,6 +68,13 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
       description: form.description || null,
       surface: parseFloat(form.surface) || null,
       rooms_count: parseInt(form.rooms_count) || null,
+      construction_year: parseInt(form.construction_year) || null,
+      rental_type: form.rental_type || null,
+      rent_control_status: rentControlResult?.status ?? property?.rent_control_status ?? null,
+      rent_control_reference: rentControlResult?.ref_price ?? property?.rent_control_reference ?? null,
+      rent_control_max: rentControlResult?.max_price ?? property?.rent_control_max ?? null,
+      rent_control_min: rentControlResult?.min_price ?? property?.rent_control_min ?? null,
+      rent_control_checked_at: rentControlResult ? new Date().toISOString() : (property?.rent_control_checked_at ?? null),
       updated_at: new Date().toISOString(),
     }
 
@@ -78,6 +101,81 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
 
   const setSelect = (key: string) => (value: string | null) =>
     setForm(f => ({ ...f, [key]: value ?? '' }))
+
+  const checkRentControl = async () => {
+    if (!form.city || !form.rooms_count || !form.surface || !form.construction_year || !form.rental_type) {
+      toast.error('Veuillez renseigner la ville, le nombre de pièces, la surface, l\'année de construction et le type de location.')
+      return
+    }
+
+    setCheckingRentControl(true)
+
+    try {
+      const rooms = Math.min(parseInt(form.rooms_count), 5)
+      const year = parseInt(form.construction_year)
+
+      let construction_period: string
+      if (year < 1946) construction_period = 'avant_1946'
+      else if (year <= 1970) construction_period = '1946_1970'
+      else if (year <= 1990) construction_period = '1971_1990'
+      else construction_period = 'apres_1990'
+
+      const cityNormalized = form.city.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .trim()
+
+      const { data: zones } = await supabase
+        .from('rent_control_zones')
+        .select('*')
+        .ilike('city', `%${cityNormalized}%`)
+        .eq('rooms_count', rooms)
+        .eq('construction_period', construction_period)
+        .eq('rental_type', form.rental_type)
+        .limit(1)
+
+      if (!zones || zones.length === 0) {
+        const result = { status: 'not_applicable' as const }
+        setRentControlResult(result)
+
+        if (property) {
+          await supabase.from('properties').update({
+            rent_control_status: 'not_applicable',
+            rent_control_checked_at: new Date().toISOString(),
+          }).eq('id', property.id)
+        }
+        return
+      }
+
+      const zone = zones[0]
+      const loyer_au_m2 = parseFloat(form.monthly_rent) / parseFloat(form.surface)
+      const isCompliant = loyer_au_m2 <= zone.max_price
+
+      const result = {
+        status: isCompliant ? 'compliant' as const : 'non_compliant' as const,
+        ref_price: zone.ref_price,
+        max_price: zone.max_price,
+        min_price: zone.min_price,
+        zone_name: zone.zone_name,
+      }
+      setRentControlResult(result)
+
+      if (property) {
+        await supabase.from('properties').update({
+          rent_control_status: result.status,
+          rent_control_reference: zone.ref_price,
+          rent_control_max: zone.max_price,
+          rent_control_min: zone.min_price,
+          rent_control_checked_at: new Date().toISOString(),
+        }).eq('id', property.id)
+      }
+
+    } catch (err) {
+      toast.error('Erreur lors de la vérification')
+      console.error(err)
+    } finally {
+      setCheckingRentControl(false)
+    }
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -149,6 +247,32 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
           <Input type="number" inputMode="numeric" placeholder="3" value={form.rooms_count} onChange={set('rooms_count')} />
         </div>
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label>Année de construction</Label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            placeholder="1990"
+            value={form.construction_year}
+            onChange={set('construction_year')}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Type de location</Label>
+          <Select value={form.rental_type} onValueChange={setSelect('rental_type')}>
+            <SelectTrigger className="w-full">
+              <span className="flex-1 text-left truncate text-sm">
+                {form.rental_type === 'furnished' ? 'Meublé' : 'Non meublé'}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unfurnished">Non meublé</SelectItem>
+              <SelectItem value="furnished">Meublé</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-2">
           <Label>Loyer (€)</Label>
@@ -167,6 +291,51 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
         <Label>Description (optionnel)</Label>
         <Textarea placeholder="Notes sur le bien..." value={form.description} onChange={set('description')} rows={2} />
       </div>
+
+      {/* Encadrement des loyers */}
+      <div className="space-y-3 border rounded-lg p-4 bg-slate-50">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-medium">Encadrement des loyers</Label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={checkRentControl}
+            disabled={checkingRentControl}
+          >
+            {checkingRentControl ? (
+              <><Loader2 className="h-3 w-3 animate-spin mr-2" />Vérification...</>
+            ) : (
+              'Vérifier'
+            )}
+          </Button>
+        </div>
+
+        {rentControlResult && (
+          <div className={`text-sm rounded-lg p-3 ${
+            rentControlResult.status === 'compliant'
+              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+              : rentControlResult.status === 'non_compliant'
+              ? 'bg-orange-50 border border-orange-200 text-orange-800'
+              : 'bg-slate-100 border border-slate-200 text-slate-600'
+          }`}>
+            {rentControlResult.status === 'compliant' && (
+              <p>✅ Loyer conforme à l&apos;encadrement des loyers.</p>
+            )}
+            {rentControlResult.status === 'non_compliant' && (
+              <>
+                <p className="font-medium">⚠️ Loyer au-dessus du plafond légal.</p>
+                <p className="mt-1">Loyer de référence majoré : <strong>{rentControlResult.max_price} €/m²</strong> (soit {Math.round((rentControlResult.max_price ?? 0) * parseFloat(form.surface || '0'))} €/mois pour {form.surface} m²)</p>
+                <p className="mt-1 text-xs">Un dépassement est possible uniquement via un complément de loyer justifié par des caractéristiques exceptionnelles du logement (vue, terrasse, prestations haut de gamme).</p>
+              </>
+            )}
+            {rentControlResult.status === 'not_applicable' && (
+              <p>ℹ️ Ce bien n&apos;est pas situé dans une zone soumise à l&apos;encadrement des loyers.</p>
+            )}
+          </div>
+        )}
+      </div>
+
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
         {property ? 'Enregistrer les modifications' : 'Ajouter le bien'}

@@ -33,6 +33,13 @@ export type Property = {
   description: string | null
   surface: number | null
   rooms_count: number | null
+  construction_year?: number | null
+  rental_type?: string | null
+  rent_control_status?: string | null
+  rent_control_reference?: number | null
+  rent_control_max?: number | null
+  rent_control_min?: number | null
+  rent_control_checked_at?: string | null
   created_at: string
   updated_at: string
 }

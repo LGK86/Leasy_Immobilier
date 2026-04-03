@@ -375,13 +375,14 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
     if (!id) return
     const { data } = await supabase
       .from('properties')
-      .select('monthly_rent, charges, deposit, surface, rooms_count')
+      .select('monthly_rent, charges, deposit, surface, rooms_count, rent_control_status')
       .eq('id', id)
       .single()
     console.log('[DocumentWizard] Property selected:', id)
     console.log('[DocumentWizard] Property data:', data)
     console.log('[DocumentWizard] surface:', data?.surface, '/ rooms_count:', data?.rooms_count)
     if (data) {
+      const isEncadre = data.rent_control_status === 'compliant' || data.rent_control_status === 'non_compliant'
       setForm(prev => ({
         ...prev,
         'Loyer mensuel (€)':     String(data.monthly_rent ?? ''),
@@ -389,6 +390,7 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
         'Depot de garantie (€)': String(data.deposit ?? ''),
         ...(data.surface != null    ? { 'Surface habitable': String(data.surface) }    : {}),
         ...(data.rooms_count != null ? { 'Nombre de pieces': String(data.rooms_count) } : {}),
+        ...(data.rent_control_status != null ? { 'Encadrement des loyers': isEncadre ? 'Oui' : 'Non' } : {}),
       }))
       if (splitRent) updateRentSplit(tenantIds, data.monthly_rent)
     }

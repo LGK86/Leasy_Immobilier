@@ -92,6 +92,19 @@ export default function PropertyList({ properties, userId }: { properties: Prope
                 const lb = getLeaseBadge(property.documents)
                 return <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${lb.className}`}>{lb.label}</span>
               })()}
+              {property.rent_control_status && (
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${
+                  property.rent_control_status === 'compliant'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : property.rent_control_status === 'non_compliant'
+                    ? 'bg-orange-100 text-orange-700'
+                    : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {property.rent_control_status === 'compliant' && '✅ Loyer encadré'}
+                  {property.rent_control_status === 'non_compliant' && '⚠️ Hors encadrement'}
+                  {property.rent_control_status === 'not_applicable' && 'ℹ️ Non soumis'}
+                </span>
+              )}
             </div>
             <CardTitle className="text-base">{typeLabels[property.type] ?? property.type}</CardTitle>
           </div>
