@@ -204,6 +204,10 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
   const [localTenants, setLocalTenants] = useState<TenantEntry[]>(tenants)
   const [splitRent, setSplitRent]       = useState(false)
   const [rentSplit, setRentSplit]       = useState<Record<string, number>>({})
+  const [checkingRentControl, setCheckingRentControl] = useState(false)
+  const [rentControlInfo, setRentControlInfo] = useState<{
+    status: 'compliant' | 'non_compliant' | 'not_applicable'
+  } | null>(null)
 
   // Inline new tenant form
   const [localProperties, setLocalProperties] = useState<{ id: string; address: string; city: string }[]>(properties)
@@ -393,6 +397,35 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
         ...(data.rent_control_status != null ? { 'Encadrement des loyers': isEncadre ? 'Oui' : 'Non' } : {}),
       }))
       if (splitRent) updateRentSplit(tenantIds, data.monthly_rent)
+    }
+  }
+
+  // ── Rent control check ───────────────────────────────────────────────────
+
+  const handleCheckRentControl = async () => {
+    if (!propertyId) {
+      toast.error('Sélectionnez un bien avant de vérifier l\'encadrement.')
+      return
+    }
+    setCheckingRentControl(true)
+    try {
+      const { data } = await supabase
+        .from('properties')
+        .select('rent_control_status')
+        .eq('id', propertyId)
+        .single()
+      if (data?.rent_control_status) {
+        const status = data.rent_control_status as 'compliant' | 'non_compliant' | 'not_applicable'
+        setRentControlInfo({ status })
+        const isEncadre = status === 'compliant' || status === 'non_compliant'
+        setForm(prev => ({ ...prev, 'Encadrement des loyers': isEncadre ? 'Oui' : 'Non' }))
+      } else {
+        toast.error('Aucune vérification d\'encadrement disponible pour ce bien. Utilisez le formulaire du bien.')
+      }
+    } catch {
+      toast.error('Erreur lors de la vérification')
+    } finally {
+      setCheckingRentControl(false)
     }
   }
 
@@ -780,6 +813,34 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
         <SF label="Encadrement des loyers" value={form['Encadrement des loyers'] ?? ''}
           options={[{ value: 'Non', label: 'Non' }, { value: 'Oui', label: 'Oui' }]}
           onChange={f('Encadrement des loyers')} />
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleCheckRentControl}
+            disabled={checkingRentControl}
+          >
+            {checkingRentControl ? (
+              <><Loader2 className="h-3 w-3 animate-spin mr-2" />Vérification...</>
+            ) : (
+              'Vérifier l\'encadrement'
+            )}
+          </Button>
+          {rentControlInfo && (
+            <span className={`text-xs px-2 py-1 rounded-md ${
+              rentControlInfo.status === 'compliant'
+                ? 'bg-emerald-100 text-emerald-700'
+                : rentControlInfo.status === 'non_compliant'
+                ? 'bg-orange-100 text-orange-700'
+                : 'bg-slate-100 text-slate-500'
+            }`}>
+              {rentControlInfo.status === 'compliant' && '✅ Conforme'}
+              {rentControlInfo.status === 'non_compliant' && '⚠️ Hors encadrement'}
+              {rentControlInfo.status === 'not_applicable' && 'ℹ️ Non soumis'}
+            </span>
+          )}
+        </div>
 
         {tenantIds.length >= 2 && (
           <div className="space-y-3 border-t border-slate-100 pt-3">

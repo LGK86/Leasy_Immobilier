@@ -9,10 +9,9 @@ import { createClient } from '@supabase/supabase-js'
 import * as https from 'https'
 import * as http from 'http'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-)
+const supabaseUrl = process.env.IMPORT_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseKey = process.env.IMPORT_SUPABASE_KEY || process.env.SUPABASE_SECRET_KEY!
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 interface RentControlRow {
   city: string

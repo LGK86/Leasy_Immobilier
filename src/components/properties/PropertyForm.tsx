@@ -33,7 +33,12 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
     description: property?.description ?? '',
     surface: property?.surface?.toString() ?? '',
     rooms_count: property?.rooms_count?.toString() ?? '',
-    construction_year: property?.construction_year?.toString() ?? '',
+    construction_period: property?.construction_year
+      ? (property.construction_year < 1946 ? 'avant_1946'
+        : property.construction_year <= 1970 ? '1946_1970'
+        : property.construction_year <= 1990 ? '1971_1990'
+        : 'apres_1990')
+      : '',
     rental_type: property?.rental_type ?? 'unfurnished',
   })
 
@@ -68,7 +73,7 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
       description: form.description || null,
       surface: parseFloat(form.surface) || null,
       rooms_count: parseInt(form.rooms_count) || null,
-      construction_year: parseInt(form.construction_year) || null,
+      construction_year: ({'avant_1946':1945,'1946_1970':1960,'1971_1990':1980,'apres_1990':2000} as Record<string,number>)[form.construction_period] || null,
       rental_type: form.rental_type || null,
       rent_control_status: rentControlResult?.status ?? property?.rent_control_status ?? null,
       rent_control_reference: rentControlResult?.ref_price ?? property?.rent_control_reference ?? null,
@@ -103,8 +108,9 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
     setForm(f => ({ ...f, [key]: value ?? '' }))
 
   const checkRentControl = async () => {
-    if (!form.city || !form.rooms_count || !form.surface || !form.construction_year || !form.rental_type) {
-      toast.error('Veuillez renseigner la ville, le nombre de pièces, la surface, l\'année de construction et le type de location.')
+    const construction_period = form.construction_period
+    if (!form.city || !form.rooms_count || !form.surface || !construction_period || !form.rental_type) {
+      toast.error('Veuillez renseigner la ville, le nombre de pièces, la surface, la période de construction et le type de location.')
       return
     }
 
@@ -112,13 +118,6 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
 
     try {
       const rooms = Math.min(parseInt(form.rooms_count), 5)
-      const year = parseInt(form.construction_year)
-
-      let construction_period: string
-      if (year < 1946) construction_period = 'avant_1946'
-      else if (year <= 1970) construction_period = '1946_1970'
-      else if (year <= 1990) construction_period = '1971_1990'
-      else construction_period = 'apres_1990'
 
       const cityNormalized = form.city.toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -249,14 +248,20 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label>Année de construction</Label>
-          <Input
-            type="number"
-            inputMode="numeric"
-            placeholder="1990"
-            value={form.construction_year}
-            onChange={set('construction_year')}
-          />
+          <Label>Période de construction</Label>
+          <Select value={form.construction_period} onValueChange={setSelect('construction_period')}>
+            <SelectTrigger className="w-full">
+              <span className="flex-1 text-left truncate text-sm">
+                {({'avant_1946':'Avant 1946','1946_1970':'1946 - 1970','1971_1990':'1971 - 1990','apres_1990':'Après 1990'} as Record<string,string>)[form.construction_period] ?? 'Sélectionner'}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="avant_1946">Avant 1946</SelectItem>
+              <SelectItem value="1946_1970">1946 - 1970</SelectItem>
+              <SelectItem value="1971_1990">1971 - 1990</SelectItem>
+              <SelectItem value="apres_1990">Après 1990</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <Label>Type de location</Label>

@@ -61,7 +61,6 @@ export default function PropertyList({ properties, userId }: { properties: Prope
 
   const rented = properties.filter(p => p.status === 'rented')
   const upcoming = properties.filter(p => p.status === 'upcoming')
-  const vacant = properties.filter(p => p.status === 'vacant')
   const pendingLease = properties.filter(p => {
     const leases = (p.documents ?? []).filter(d => d.type === 'lease')
     const activeLease = [...leases].reverse().find(d =>
@@ -71,12 +70,14 @@ export default function PropertyList({ properties, userId }: { properties: Prope
     return activeLease?.status === 'pending_tenant_signature'
   })
   const draft = properties.filter(p => {
+    if (p.status !== 'vacant') return false
     const leases = (p.documents ?? []).filter(d => d.type === 'lease')
-    const hasActiveLease = leases.some(d =>
-      ['signed', 'pending_tenant_signature', 'finalized'].includes(d.status) &&
-      !d.content?.closed_at
-    )
-    return !hasActiveLease && p.status === 'vacant'
+    return leases.length === 0 || leases.every(d => d.status === 'draft')
+  })
+  const vacant = properties.filter(p => {
+    if (p.status !== 'vacant') return false
+    const leases = (p.documents ?? []).filter(d => d.type === 'lease')
+    return leases.some(d => d.status === 'finalized' || d.content?.closed_at)
   })
 
   const PropertyCard = ({ property }: { property: PropertyWithDocs }) => (
