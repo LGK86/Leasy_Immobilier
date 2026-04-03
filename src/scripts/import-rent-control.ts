@@ -1,3 +1,10 @@
+import * as dotenv from 'dotenv'
+import * as path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local') })
+
 import { createClient } from '@supabase/supabase-js'
 import * as https from 'https'
 import * as http from 'http'
@@ -53,26 +60,43 @@ async function importParis(): Promise<RentControlRow[]> {
   const headers = lines[0].split(';').map(h => h.trim().replace(/^"|"$/g, ''))
   console.log('[paris] Colonnes :', headers.join(', '))
 
+  // Normalize accents for matching
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const normHeaders = headers.map(norm)
+
+  const colIdx = (pattern: string, exclude?: string) => {
+    const p = norm(pattern)
+    const e = exclude ? norm(exclude) : null
+    return normHeaders.findIndex(h => h.includes(p) && (!e || !h.includes(e)))
+  }
+
+  const iPiece   = colIdx('piece')
+  const iEpoque  = colIdx('epoque') >= 0 ? colIdx('epoque') : colIdx('construction')
+  const iType    = colIdx('location') >= 0 ? colIdx('location') : colIdx('type')
+  const iRef     = colIdx('reference', 'major') >= 0 ? colIdx('reference', 'major') : colIdx('ref', 'max')
+  const iMax     = colIdx('major')
+  const iMin     = colIdx('minor')
+  const iZoneId  = colIdx('secteur') >= 0 ? colIdx('secteur') : colIdx('numero du quartier')
+  const iZoneName = colIdx('nom du quartier') >= 0 ? colIdx('nom du quartier') : colIdx('nom_quartier')
+  const iAnnee   = colIdx('annee')
+
+  console.log(`[paris] Index colonnes — piece:${iPiece} epoque:${iEpoque} type:${iType} ref:${iRef} max:${iMax} min:${iMin} zone:${iZoneId} nom:${iZoneName} annee:${iAnnee}`)
+
   const rows: RentControlRow[] = []
-  const YEAR = 2024
 
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(';').map(c => c.trim().replace(/^"|"$/g, ''))
     if (cols.length < 4) continue
 
-    const get = (name: string) => {
-      const idx = headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()))
-      return idx >= 0 ? cols[idx] ?? '' : ''
-    }
-
-    const pieceRaw = get('piece') || get('nb_piece') || get('nombre')
-    const epoqueRaw = get('epoque') || get('annee') || get('periode')
-    const meubleRaw = get('meuble') || get('type')
-    const refRaw = get('ref') || get('loyer_ref')
-    const maxRaw = get('max') || get('loyer_max')
-    const minRaw = get('min') || get('loyer_min')
-    const zoneIdRaw = get('id_zone') || get('zone_id') || get('id')
-    const zoneNameRaw = get('nom_quartier') || get('quartier') || get('zone_name') || get('libelle')
+    const pieceRaw   = iPiece    >= 0 ? cols[iPiece]    : ''
+    const epoqueRaw  = iEpoque   >= 0 ? cols[iEpoque]   : ''
+    const meubleRaw  = iType     >= 0 ? cols[iType]     : ''
+    const refRaw     = iRef      >= 0 ? cols[iRef]      : ''
+    const maxRaw     = iMax      >= 0 ? cols[iMax]      : ''
+    const minRaw     = iMin      >= 0 ? cols[iMin]      : ''
+    const zoneIdRaw  = iZoneId   >= 0 ? cols[iZoneId]   : ''
+    const zoneNameRaw = iZoneName >= 0 ? cols[iZoneName] : ''
+    const anneeRaw   = iAnnee    >= 0 ? cols[iAnnee]    : ''
 
     const piece = parseInt(pieceRaw)
     const ref = parseFloat(refRaw.replace(',', '.'))
@@ -81,9 +105,11 @@ async function importParis(): Promise<RentControlRow[]> {
 
     if (isNaN(piece) || isNaN(ref) || isNaN(max) || isNaN(min)) continue
 
-    const meubleNorm = meubleRaw.toLowerCase()
+    const meubleNorm = norm(meubleRaw)
     const rental_type: 'furnished' | 'unfurnished' =
       meubleNorm.includes('meubl') ? 'furnished' : 'unfurnished'
+
+    const year = parseInt(anneeRaw) || 2024
 
     rows.push({
       city: 'paris',
@@ -95,7 +121,7 @@ async function importParis(): Promise<RentControlRow[]> {
       ref_price: ref,
       max_price: max,
       min_price: min,
-      year: YEAR,
+      year,
     })
   }
 
