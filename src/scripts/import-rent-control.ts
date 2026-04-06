@@ -59,7 +59,6 @@ async function importParis(): Promise<RentControlRow[]> {
   const headers = lines[0].split(';').map(h => h.trim().replace(/^"|"$/g, ''))
   console.log('[paris] Colonnes :', headers.join(', '))
 
-  // Normalize accents for matching
   const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   const normHeaders = headers.map(norm)
 
@@ -69,15 +68,16 @@ async function importParis(): Promise<RentControlRow[]> {
     return normHeaders.findIndex(h => h.includes(p) && (!e || !h.includes(e)))
   }
 
-  const iPiece   = colIdx('piece')
-  const iEpoque  = colIdx('epoque') >= 0 ? colIdx('epoque') : colIdx('construction')
-  const iType    = colIdx('location') >= 0 ? colIdx('location') : colIdx('type')
-  const iRef     = colIdx('reference', 'major') >= 0 ? colIdx('reference', 'major') : colIdx('ref', 'max')
-  const iMax     = colIdx('major')
-  const iMin     = colIdx('minor')
-  const iZoneId  = colIdx('secteur') >= 0 ? colIdx('secteur') : colIdx('numero du quartier')
+  const iPiece    = colIdx('piece')
+  const iEpoque   = colIdx('epoque') >= 0 ? colIdx('epoque') : colIdx('construction')
+  const iType     = colIdx('type de location') >= 0 ? colIdx('type de location') : colIdx('location')
+  const iZoneId   = colIdx('numero du quartier') >= 0 ? colIdx('numero du quartier') : colIdx('quartier')
   const iZoneName = colIdx('nom du quartier') >= 0 ? colIdx('nom du quartier') : colIdx('nom_quartier')
-  const iAnnee   = colIdx('annee')
+  const iRef      = colIdx('loyers de reference') >= 0 ? colIdx('loyers de reference') :
+                    colIdx('reference', 'major') >= 0 ? colIdx('reference', 'major') : colIdx('ref', 'max')
+  const iMax      = colIdx('majore') >= 0 ? colIdx('majore') : colIdx('major')
+  const iMin      = colIdx('minore') >= 0 ? colIdx('minore') : colIdx('minor')
+  const iAnnee    = colIdx('annee')
 
   console.log(`[paris] Index colonnes — piece:${iPiece} epoque:${iEpoque} type:${iType} ref:${iRef} max:${iMax} min:${iMin} zone:${iZoneId} nom:${iZoneName} annee:${iAnnee}`)
 
@@ -87,25 +87,26 @@ async function importParis(): Promise<RentControlRow[]> {
     const cols = lines[i].split(';').map(c => c.trim().replace(/^"|"$/g, ''))
     if (cols.length < 4) continue
 
-    const pieceRaw   = iPiece    >= 0 ? cols[iPiece]    : ''
-    const epoqueRaw  = iEpoque   >= 0 ? cols[iEpoque]   : ''
-    const meubleRaw  = iType     >= 0 ? cols[iType]     : ''
-    const refRaw     = iRef      >= 0 ? cols[iRef]      : ''
-    const maxRaw     = iMax      >= 0 ? cols[iMax]      : ''
-    const minRaw     = iMin      >= 0 ? cols[iMin]      : ''
-    const zoneIdRaw  = iZoneId   >= 0 ? cols[iZoneId]   : ''
+    const pieceRaw    = iPiece    >= 0 ? cols[iPiece]    : ''
+    const epoqueRaw   = iEpoque   >= 0 ? cols[iEpoque]   : ''
+    const meubleRaw   = iType     >= 0 ? cols[iType]     : ''
+    const refRaw      = iRef      >= 0 ? cols[iRef]      : ''
+    const maxRaw      = iMax      >= 0 ? cols[iMax]      : ''
+    const minRaw      = iMin      >= 0 ? cols[iMin]      : ''
+    const zoneIdRaw   = iZoneId   >= 0 ? cols[iZoneId]   : ''
     const zoneNameRaw = iZoneName >= 0 ? cols[iZoneName] : ''
-    const anneeRaw   = iAnnee    >= 0 ? cols[iAnnee]    : ''
+    const anneeRaw    = iAnnee    >= 0 ? cols[iAnnee]    : ''
 
     const piece = parseInt(pieceRaw)
-    const ref = parseFloat(refRaw.replace(',', '.'))
-    const max = parseFloat(maxRaw.replace(',', '.'))
-    const min = parseFloat(minRaw.replace(',', '.'))
+    const ref   = parseFloat(refRaw.replace(',', '.'))
+    const max   = parseFloat(maxRaw.replace(',', '.'))
+    const min   = parseFloat(minRaw.replace(',', '.'))
 
     if (isNaN(piece) || isNaN(ref) || isNaN(max) || isNaN(min)) continue
 
     const meubleNorm = norm(meubleRaw)
     const rental_type: 'furnished' | 'unfurnished' =
+      meubleNorm.includes('non') ? 'unfurnished' :
       meubleNorm.includes('meubl') ? 'furnished' : 'unfurnished'
 
     const year = parseInt(anneeRaw) || 2024
@@ -126,7 +127,6 @@ async function importParis(): Promise<RentControlRow[]> {
 
   console.log(`[paris] ${rows.length} lignes parsées`)
 
-  // Garder uniquement le millésime le plus récent
   const maxYear = Math.max(...rows.map(r => r.year))
   const filteredRows = rows.filter(r => r.year === maxYear)
   console.log(`[paris] Millésime retenu : ${maxYear} (${filteredRows.length} lignes)`)
@@ -160,19 +160,21 @@ async function importLyon(): Promise<RentControlRow[]> {
 
   for (const feat of features) {
     const p = feat.properties ?? {}
-    const piece = parseInt(p.nb_piece ?? p.nbpiece ?? p.pieces ?? '')
-    const ref = parseFloat(p.ref ?? p.loyer_ref ?? p.loyerref ?? '')
-    const max = parseFloat(p.max ?? p.loyer_max ?? p.loyermax ?? '')
-    const min = parseFloat(p.min ?? p.loyer_min ?? p.loyermin ?? '')
-    const epoque = p.epoque ?? p.periode_construction ?? p.annee_construction ?? ''
-    const meuble = p.meuble ?? p.type_location ?? p.furnished ?? ''
-    const zoneId = String(p.id_zone ?? p.zone_id ?? p.identifiant ?? '')
+    const piece    = parseInt(p.nb_piece ?? p.nbpiece ?? p.pieces ?? '')
+    const ref      = parseFloat(p.ref ?? p.loyer_ref ?? p.loyerref ?? '')
+    const max      = parseFloat(p.max ?? p.loyer_max ?? p.loyermax ?? '')
+    const min      = parseFloat(p.min ?? p.loyer_min ?? p.loyermin ?? '')
+    const epoque   = p.epoque ?? p.periode_construction ?? p.annee_construction ?? ''
+    const meuble   = p.meuble ?? p.type_location ?? p.furnished ?? ''
+    const zoneId   = String(p.id_zone ?? p.zone_id ?? p.identifiant ?? '')
     const zoneName = p.nom_quartier ?? p.quartier ?? p.libelle ?? p.zone_name ?? ''
 
     if (isNaN(piece) || isNaN(ref) || isNaN(max) || isNaN(min)) continue
 
+    const meubleNorm = String(meuble).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     const rental_type: 'furnished' | 'unfurnished' =
-      String(meuble).toLowerCase().includes('meubl') ? 'furnished' : 'unfurnished'
+      meubleNorm.includes('non') ? 'unfurnished' :
+      meubleNorm.includes('meubl') ? 'furnished' : 'unfurnished'
 
     rows.push({
       city: 'lyon',
@@ -213,7 +215,6 @@ async function main() {
   console.log('Vidage de la table rent_control_zones...')
   const { error: truncErr } = await supabase.rpc('truncate_rent_control_zones')
   if (truncErr) {
-    // Fallback: delete all rows
     await supabase.from('rent_control_zones').delete().neq('id', '00000000-0000-0000-0000-000000000000')
   }
 

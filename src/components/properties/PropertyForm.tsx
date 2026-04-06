@@ -123,6 +123,17 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         .trim()
 
+      // Dériver l'arrondissement depuis le code postal (75001→1, 75008→8, etc.)
+      const postalCode = form.postal_code.trim()
+      const arrondissement = postalCode.startsWith('75') && postalCode.length === 5
+        ? parseInt(postalCode.slice(3), 10) || null
+        : null
+
+      // Les quartiers parisiens sont numérotés 1-80, 4 par arrondissement
+      // Arrondissement N → quartiers (N-1)*4+1 à N*4
+      const quarterMin = arrondissement ? (arrondissement - 1) * 4 + 1 : null
+      const quarterMax = arrondissement ? arrondissement * 4 : null
+
       // Récupérer le millésime le plus récent disponible
       const { data: latestYear } = await supabase
         .from('rent_control_zones')
@@ -133,7 +144,13 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
 
       const year = latestYear?.[0]?.year
 
-      const { data: zones } = await supabase
+      if (!year) {
+        setRentControlResult({ status: 'not_applicable' })
+        return
+      }
+
+      // Construire la requête avec filtre optionnel par quartier
+      let query = supabase
         .from('rent_control_zones')
         .select('*')
         .ilike('city', `%${cityNormalized}%`)
@@ -141,7 +158,14 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
         .eq('construction_period', construction_period)
         .eq('rental_type', form.rental_type)
         .eq('year', year)
-        .limit(1)
+
+      if (quarterMin !== null && quarterMax !== null) {
+        query = query
+          .gte('zone_id', String(quarterMin))
+          .lte('zone_id', String(quarterMax))
+      }
+
+      const { data: zones } = await query.limit(1)
 
       if (!zones || zones.length === 0) {
         const result = { status: 'not_applicable' as const }
