@@ -140,7 +140,7 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
         return
       }
 
-      const { data: zones } = await supabase
+      let query = supabase
         .from('rent_control_zones')
         .select('*')
         .ilike('city', `%${cityNormalized}%`)
@@ -148,7 +148,22 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
         .eq('construction_period', construction_period)
         .eq('rental_type', form.rental_type)
         .eq('year', year)
-        .limit(1)
+
+      // Filtre par arrondissement via cast integer sur zone_id
+      const postalCode = form.postal_code.trim()
+      const arrondissement = postalCode.startsWith('75') && postalCode.length === 5
+        ? parseInt(postalCode.slice(3), 10) || null
+        : null
+
+      if (arrondissement !== null) {
+        const quarterMin = (arrondissement - 1) * 4 + 1
+        const quarterMax = arrondissement * 4
+        query = query
+          .filter('zone_id', 'gte', quarterMin)
+          .filter('zone_id', 'lte', quarterMax)
+      }
+
+      const { data: zones } = await query.limit(1)
       console.log('[rent-control] zones result:', zones)
 
       if (!zones || zones.length === 0) {
