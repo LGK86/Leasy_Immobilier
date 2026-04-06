@@ -123,6 +123,16 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         .trim()
 
+      // Récupérer le millésime le plus récent disponible
+      const { data: latestYear } = await supabase
+        .from('rent_control_zones')
+        .select('year')
+        .ilike('city', `%${cityNormalized}%`)
+        .order('year', { ascending: false })
+        .limit(1)
+
+      const year = latestYear?.[0]?.year
+
       const { data: zones } = await supabase
         .from('rent_control_zones')
         .select('*')
@@ -130,6 +140,7 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
         .eq('rooms_count', rooms)
         .eq('construction_period', construction_period)
         .eq('rental_type', form.rental_type)
+        .eq('year', year)
         .limit(1)
 
       if (!zones || zones.length === 0) {

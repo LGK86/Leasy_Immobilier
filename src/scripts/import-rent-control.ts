@@ -125,7 +125,12 @@ async function importParis(): Promise<RentControlRow[]> {
   }
 
   console.log(`[paris] ${rows.length} lignes parsées`)
-  return rows
+
+  // Garder uniquement le millésime le plus récent
+  const maxYear = Math.max(...rows.map(r => r.year))
+  const filteredRows = rows.filter(r => r.year === maxYear)
+  console.log(`[paris] Millésime retenu : ${maxYear} (${filteredRows.length} lignes)`)
+  return filteredRows
 }
 
 async function importLyon(): Promise<RentControlRow[]> {

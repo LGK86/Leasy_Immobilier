@@ -7,6 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/u
 import { createClient } from '@/lib/supabase/client'
 import { ChevronLeft, ChevronRight, Plus, Trash2, User, Building, X, UserPlus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -207,7 +211,12 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
   const [checkingRentControl, setCheckingRentControl] = useState(false)
   const [rentControlInfo, setRentControlInfo] = useState<{
     status: 'compliant' | 'non_compliant' | 'not_applicable'
+    ref_price?: number
+    max_price?: number
+    min_price?: number
   } | null>(null)
+  const [constructionPeriod, setConstructionPeriod] = useState('')
+  const [showRentControlWarning, setShowRentControlWarning] = useState(false)
 
   // Inline new tenant form
   const [localProperties, setLocalProperties] = useState<{ id: string; address: string; city: string }[]>(properties)
@@ -407,21 +416,79 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
       toast.error('Sélectionnez un bien avant de vérifier l\'encadrement.')
       return
     }
+    if (!constructionPeriod) {
+      toast.error('Veuillez sélectionner la période de construction.')
+      return
+    }
     setCheckingRentControl(true)
     try {
-      const { data } = await supabase
+      const { data: propData } = await supabase
         .from('properties')
-        .select('rent_control_status')
+        .select('city, rental_type, surface, rooms_count, monthly_rent')
         .eq('id', propertyId)
         .single()
-      if (data?.rent_control_status) {
-        const status = data.rent_control_status as 'compliant' | 'non_compliant' | 'not_applicable'
-        setRentControlInfo({ status })
-        const isEncadre = status === 'compliant' || status === 'non_compliant'
-        setForm(prev => ({ ...prev, 'Encadrement des loyers': isEncadre ? 'Oui' : 'Non' }))
-      } else {
-        toast.error('Aucune vérification d\'encadrement disponible pour ce bien. Utilisez le formulaire du bien.')
+
+      if (!propData) {
+        toast.error('Impossible de récupérer les données du bien.')
+        return
       }
+
+      const cityNormalized = (propData.city ?? '')
+        .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+      const surface = parseFloat(form['Surface habitable'] ?? '') || propData.surface
+      const rooms = Math.min(parseInt(form['Nombre de pieces'] ?? '') || propData.rooms_count || 0, 5)
+      const loyer = parseFloat(form['Loyer mensuel (€)'] ?? '') || propData.monthly_rent || 0
+      const rental_type = propData.rental_type ?? 'unfurnished'
+
+      if (!cityNormalized || !surface || !rooms) {
+        toast.error('Veuillez renseigner la surface et le nombre de pièces dans la section "Le logement".')
+        return
+      }
+
+      // Récupérer le millésime le plus récent disponible
+      const { data: latestYear } = await supabase
+        .from('rent_control_zones')
+        .select('year')
+        .ilike('city', `%${cityNormalized}%`)
+        .order('year', { ascending: false })
+        .limit(1)
+
+      const year = latestYear?.[0]?.year
+
+      if (!year) {
+        setRentControlInfo({ status: 'not_applicable' })
+        setForm(prev => ({ ...prev, 'Encadrement des loyers': 'Non' }))
+        return
+      }
+
+      const { data: zones } = await supabase
+        .from('rent_control_zones')
+        .select('*')
+        .ilike('city', `%${cityNormalized}%`)
+        .eq('rooms_count', rooms)
+        .eq('construction_period', constructionPeriod)
+        .eq('rental_type', rental_type)
+        .eq('year', year)
+        .limit(1)
+
+      if (!zones || zones.length === 0) {
+        setRentControlInfo({ status: 'not_applicable' })
+        setForm(prev => ({ ...prev, 'Encadrement des loyers': 'Non' }))
+        return
+      }
+
+      const zone = zones[0]
+      const loyer_au_m2 = loyer / surface
+      const isCompliant = loyer_au_m2 <= zone.max_price
+
+      const result = {
+        status: isCompliant ? 'compliant' as const : 'non_compliant' as const,
+        ref_price: zone.ref_price,
+        max_price: zone.max_price,
+        min_price: zone.min_price,
+      }
+      setRentControlInfo(result)
+      setForm(prev => ({ ...prev, 'Encadrement des loyers': 'Oui' }))
     } catch {
       toast.error('Erreur lors de la vérification')
     } finally {
@@ -499,6 +566,19 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
       setSection(s => s + 1)
       return
     }
+    // Intercepter au clic "Suivant" depuis la section Finances si loyer hors encadrement
+    const financesSectionIdx = sections.indexOf('Finances') + 1
+    if (docType === 'lease' && section === financesSectionIdx && rentControlInfo?.status === 'non_compliant') {
+      setShowRentControlWarning(true)
+      return
+    }
+    autoSave()
+    if (section < total) setSection(s => s + 1)
+    else if (isEmbedded && onComplete) onComplete()
+    else onSave?.(buildFinalContent())
+  }
+
+  const proceedToNextStep = () => {
     autoSave()
     if (section < total) setSection(s => s + 1)
     else if (isEmbedded && onComplete) onComplete()
@@ -813,6 +893,21 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
         <SF label="Encadrement des loyers" value={form['Encadrement des loyers'] ?? ''}
           options={[{ value: 'Non', label: 'Non' }, { value: 'Oui', label: 'Oui' }]}
           onChange={f('Encadrement des loyers')} />
+        <LF label="Période de construction">
+          <Select value={constructionPeriod || undefined} onValueChange={(v: string | null) => setConstructionPeriod(v ?? '')}>
+            <SelectTrigger className="w-full">
+              <span className="flex-1 text-left truncate text-sm">
+                {({'avant_1946':'Avant 1946','1946_1970':'1946 - 1970','1971_1990':'1971 - 1990','apres_1990':'Après 1990'} as Record<string,string>)[constructionPeriod] ?? <span className="text-muted-foreground">Sélectionner</span>}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="avant_1946">Avant 1946</SelectItem>
+              <SelectItem value="1946_1970">1946 - 1970</SelectItem>
+              <SelectItem value="1971_1990">1971 - 1990</SelectItem>
+              <SelectItem value="apres_1990">Après 1990</SelectItem>
+            </SelectContent>
+          </Select>
+        </LF>
         <div className="flex items-center gap-2">
           <Button
             type="button"
@@ -827,20 +922,30 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
               'Vérifier l\'encadrement'
             )}
           </Button>
-          {rentControlInfo && (
-            <span className={`text-xs px-2 py-1 rounded-md ${
-              rentControlInfo.status === 'compliant'
-                ? 'bg-emerald-100 text-emerald-700'
-                : rentControlInfo.status === 'non_compliant'
-                ? 'bg-orange-100 text-orange-700'
-                : 'bg-slate-100 text-slate-500'
-            }`}>
-              {rentControlInfo.status === 'compliant' && '✅ Conforme'}
-              {rentControlInfo.status === 'non_compliant' && '⚠️ Hors encadrement'}
-              {rentControlInfo.status === 'not_applicable' && 'ℹ️ Non soumis'}
-            </span>
-          )}
         </div>
+        {rentControlInfo && (
+          <div className={`text-sm rounded-lg p-3 mt-2 ${
+            rentControlInfo.status === 'compliant'
+              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+              : rentControlInfo.status === 'non_compliant'
+              ? 'bg-orange-50 border border-orange-200 text-orange-800'
+              : 'bg-slate-100 border border-slate-200 text-slate-600'
+          }`}>
+            {rentControlInfo.status === 'compliant' && (
+              <p>✅ Loyer conforme à l&apos;encadrement des loyers.</p>
+            )}
+            {rentControlInfo.status === 'non_compliant' && (
+              <>
+                <p className="font-medium">⚠️ Loyer au-dessus du plafond légal.</p>
+                <p className="mt-1">Loyer de référence majoré : <strong>{rentControlInfo.max_price} €/m²</strong></p>
+                <p className="mt-1 text-xs">Un dépassement est possible uniquement via un complément de loyer justifié par des caractéristiques exceptionnelles du logement (vue, terrasse, prestations haut de gamme).</p>
+              </>
+            )}
+            {rentControlInfo.status === 'not_applicable' && (
+              <p>ℹ️ Ce bien n&apos;est pas situé dans une zone soumise à l&apos;encadrement des loyers.</p>
+            )}
+          </div>
+        )}
 
         {tenantIds.length >= 2 && (
           <div className="space-y-3 border-t border-slate-100 pt-3">
@@ -1132,6 +1237,24 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
         </div>
       </div>
       <Nav />
+      <AlertDialog open={showRentControlWarning} onOpenChange={setShowRentControlWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>⚠️ Loyer hors encadrement</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le loyer saisi dépasse le loyer de référence majoré légal.
+              Un dépassement est uniquement possible via un complément de loyer justifié par des caractéristiques exceptionnelles du logement (vue, terrasse, prestations haut de gamme).
+              Souhaitez-vous continuer malgré tout ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Corriger le loyer</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setShowRentControlWarning(false); proceedToNextStep() }}>
+              Continuer quand même
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
