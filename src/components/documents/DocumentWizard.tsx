@@ -568,6 +568,7 @@ export default function DocumentWizard({ doc, onSave, onDocCreated, properties =
     }
     // Intercepter au clic "Suivant" depuis la section Finances si loyer hors encadrement
     const financesSectionIdx = sections.indexOf('Finances') + 1
+    console.log('[handleNext] section:', section, 'financesSectionIdx:', financesSectionIdx, 'rentControlStatus:', rentControlInfo?.status)
     if (docType === 'lease' && section === financesSectionIdx && rentControlInfo?.status === 'non_compliant') {
       setShowRentControlWarning(true)
       return
