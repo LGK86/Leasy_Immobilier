@@ -132,6 +132,8 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
         .limit(1)
 
       const year = latestYear?.[0]?.year
+      console.log('[rent-control] year:', year)
+      console.log('[rent-control] query params:', { cityNormalized, rooms, construction_period, rental_type: form.rental_type, year })
 
       if (!year) {
         setRentControlResult({ status: 'not_applicable' })
@@ -147,6 +149,7 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
         .eq('rental_type', form.rental_type)
         .eq('year', year)
         .limit(1)
+      console.log('[rent-control] zones result:', zones)
 
       if (!zones || zones.length === 0) {
         const result = { status: 'not_applicable' as const }
