@@ -30,12 +30,14 @@ export default function AddressAutocomplete({ value, onChange, placeholder, clas
   const [open, setOpen] = useState(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const justSelected = useRef(false)
 
   useEffect(() => {
     setQuery(value)
   }, [value])
 
   useEffect(() => {
+    if (justSelected.current) return
     if (debounce.current) clearTimeout(debounce.current)
     if (query.length < 3) { setSuggestions([]); return }
     debounce.current = setTimeout(async () => {
@@ -62,6 +64,8 @@ export default function AddressAutocomplete({ value, onChange, placeholder, clas
   }, [])
 
   const select = (f: Feature) => {
+    justSelected.current = true
+    setTimeout(() => { justSelected.current = false }, 300)
     const p = f.properties
     const address = p.name
     onChange(address, p.city, p.postcode)
@@ -87,7 +91,7 @@ export default function AddressAutocomplete({ value, onChange, placeholder, clas
             <li
               key={i}
               className={cn('px-3 py-2 text-sm cursor-pointer text-leasy-dark hover:bg-leasy-bg', i > 0 && 'border-t border-leasy-border')}
-              onMouseDown={() => select(f)}
+              onMouseUp={() => select(f)}
             >
               <span className="font-medium">{f.properties.name}</span>
               <span className="text-leasy-muted ml-1">{f.properties.postcode} {f.properties.city}</span>
