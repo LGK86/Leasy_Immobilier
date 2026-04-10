@@ -57,8 +57,8 @@ export default function AddressAutocomplete({ value, onChange, placeholder, clas
         setOpen(false)
       }
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('mouseup', handler)
+    return () => document.removeEventListener('mouseup', handler)
   }, [])
 
   const select = (f: Feature) => {
