@@ -43,7 +43,7 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
   })
 
   const [rentControlResult, setRentControlResult] = useState<{
-    status: 'compliant' | 'non_compliant' | 'not_applicable' | null
+    status: 'compliant' | 'non_compliant' | 'not_applicable' | 'no_data' | null
     ref_price?: number
     max_price?: number
     min_price?: number
@@ -136,7 +136,7 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
       console.log('[rent-control] query params:', { cityNormalized, rooms, construction_period, rental_type: form.rental_type, year })
 
       if (!year) {
-        setRentControlResult({ status: 'not_applicable' })
+        setRentControlResult({ status: 'no_data' })
         return
       }
 
@@ -373,6 +373,9 @@ export default function PropertyForm({ property, userId, onSuccess }: PropertyFo
             )}
             {rentControlResult.status === 'not_applicable' && (
               <p>ℹ️ Ce bien n&apos;est pas situé dans une zone soumise à l&apos;encadrement des loyers.</p>
+            )}
+            {rentControlResult.status === 'no_data' && (
+              <p>ℹ️ Données d&apos;encadrement non disponibles pour cette ville.</p>
             )}
           </div>
         )}
